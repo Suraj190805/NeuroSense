@@ -1,0 +1,152 @@
+/* ═══════════════════════════════════════════════════════════
+   NeuroSense — Immersive Design System
+   Warm light theme with coral/amber accents
+   ═══════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&family=Playfair+Display:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Warm light backgrounds */
+  --bg-body: #faf8f5;
+  --bg-white: #ffffff;
+  --bg-cream: #f5f0eb;
+  --bg-warm: #fdf5ef;
+  --bg-card: rgba(255, 255, 255, 0.85);
+  --bg-glass: rgba(255, 255, 255, 0.6);
+  --bg-input: #faf8f5;
+
+  /* Text */
+  --text-dark: #1a1a2e;
+  --text-body: #3d3d5c;
+  --text-secondary: #6b6b8d;
+  --text-muted: #9b9bb0;
+  --text-light: #c4c4d4;
+
+  /* Accent: warm coral/amber */
+  --accent: #e07a5f;
+  --accent-dark: #c9623f;
+  --accent-light: #f4a68e;
+  --accent-soft: rgba(224, 122, 95, 0.08);
+  --accent-glow: rgba(224, 122, 95, 0.15);
+
+  /* Secondary: deep indigo */
+  --indigo: #2d3561;
+  --indigo-light: #435285;
+  --indigo-soft: rgba(45, 53, 97, 0.06);
+
+  /* Tertiary: amber gold */
+  --gold: #d4a853;
+  --gold-soft: rgba(212, 168, 83, 0.1);
+
+  /* Semantic */
+  --success: #3d9970;
+  --success-soft: rgba(61, 153, 112, 0.08);
+  --warning: #e09f3e;
+  --warning-soft: rgba(224, 159, 62, 0.08);
+  --danger: #d64545;
+  --danger-soft: rgba(214, 69, 69, 0.08);
+
+  /* Stage colors */
+  --stage-pre: #3d9970;
+  --stage-early: #e09f3e;
+  --stage-advanced: #d64545;
+
+  /* Borders & shadows */
+  --border: rgba(45, 53, 97, 0.08);
+  --border-hover: rgba(45, 53, 97, 0.15);
+  --shadow-sm: 0 1px 3px rgba(45, 53, 97, 0.06);
+  --shadow-md: 0 4px 20px rgba(45, 53, 97, 0.08);
+  --shadow-lg: 0 12px 40px rgba(45, 53, 97, 0.1);
+  --shadow-xl: 0 20px 60px rgba(45, 53, 97, 0.12);
+
+  /* Fonts */
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-serif: 'Playfair Display', Georgia, serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Radii */
+  --r-sm: 8px;
+  --r-md: 14px;
+  --r-lg: 20px;
+  --r-xl: 28px;
+  --r-full: 9999px;
+
+  /* Animation */
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --dur: 0.3s;
+}
+
+/* ── Dark Mode Theme ── */
+[data-theme="dark"] {
+  --bg-body: #0f1117;
+  --bg-white: #1a1c25;
+  --bg-cream: #15171f;
+  --bg-warm: #1e2030;
+  --bg-card: rgba(26, 28, 37, 0.9);
+  --bg-glass: rgba(26, 28, 37, 0.7);
+  --bg-input: #1e2030;
+
+  --text-dark: #e8e8f0;
+  --text-body: #c0c0d4;
+  --text-secondary: #9898b0;
+  --text-muted: #6b6b85;
+  --text-light: #4a4a60;
+
+  --accent: #f0906e;
+  --accent-dark: #e07a5f;
+  --accent-light: #f4a68e;
+  --accent-soft: rgba(240, 144, 110, 0.1);
+  --accent-glow: rgba(240, 144, 110, 0.18);
+
+  --indigo: #8890b8;
+  --indigo-light: #a0a8d0;
+  --indigo-soft: rgba(136, 144, 184, 0.1);
+
+  --gold: #e0b860;
+  --gold-soft: rgba(224, 184, 96, 0.1);
+
+  --success: #4eca88;
+  --success-soft: rgba(78, 202, 136, 0.1);
+  --warning: #f0b050;
+  --warning-soft: rgba(240, 176, 80, 0.1);
+  --danger: #f06060;
+  --danger-soft: rgba(240, 96, 96, 0.1);
+
+  --stage-pre: #4eca88;
+  --stage-early: #f0b050;
+  --stage-advanced: #f06060;
+
+  --border: rgba(255, 255, 255, 0.08);
+  --border-hover: rgba(255, 255, 255, 0.15);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.25);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.35);
+}
+
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--bg-body);
+  color: var(--text-body);
+  line-height: 1.7;
+  overflow-x: hidden;
+  transition: background 0.4s ease, color 0.4s ease;
+}
+
+::selection { background: var(--accent-glow); color: var(--accent-dark); }
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--text-light); border-radius: 3px; }
+
+img { max-width: 100%; height: auto; }
+a { color: var(--accent); text-decoration: none; }

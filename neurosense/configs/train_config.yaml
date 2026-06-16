@@ -1,0 +1,128 @@
+# NeuroSense — Training Configuration
+# PRD Sections 3.3, 4.2.2, 8, 11
+
+# ─── Data Split (PRD 3.3) ───
+data:
+  root_dir: "./data/raw"  # Configurable path for PREDICT-HD or OpenNeuro
+  split_ratios:
+    train: 0.70
+    val: 0.15
+    test: 0.15
+  split_seed: 42
+  # Subject-level split — no subject in multiple splits
+  split_strategy: "subject_stratified"
+  # Number of worker processes for DataLoader
+  num_workers: 4
+  pin_memory: true
+
+# ─── Training Hyperparameters (PRD 4.2.2, Phase 2) ───
+training:
+  # Batch size — reduced for 3D volumes on limited GPU memory
+  batch_size: 4
+  # Total training epochs
+  epochs: 50
+  # AdamW optimiser
+  optimizer:
+    name: "adamw"
+    lr: 1.0e-4
+    weight_decay: 1.0e-5
+    betas: [0.9, 0.999]
+  # Learning rate schedule: cosine warmup then cosine decay
+  scheduler:
+    name: "cosine_warmup"
+    warmup_epochs: 5
+    min_lr: 1.0e-6
+  # Mixed precision training (PRD 4.2.2)
+  mixed_precision: true
+  # Gradient checkpointing for memory efficiency (PRD Risk mitigation)
+  gradient_checkpointing: false
+  # Gradient accumulation steps (effective batch = batch_size * accum)
+  gradient_accumulation_steps: 1
+
+# ─── Early Stopping (PRD 4.2.2) ───
+early_stopping:
+  patience: 10
+  monitor: "val_auc_mean"
+  mode: "max"  # Higher AUC is better
+  min_delta: 0.001
+
+# ─── Loss Functions (PRD 4.2.5, 4.2.6) ───
+loss:
+  # Classification: cross-entropy with inverse frequency weighting
+  classification:
+    name: "weighted_cross_entropy"
+    # Weights computed dynamically from class distribution
+    auto_weight: true
+  # Progression: Huber loss (robust to outliers)
+  progression:
+    name: "huber"
+    delta: 1.0
+  # Combined loss weighting
+  combined:
+    classification_weight: 1.0
+    progression_weight: 0.5
+
+# ─── Checkpointing ───
+checkpointing:
+  save_dir: "./checkpoints"
+  save_best: true
+  save_last: true
+  filename_format: "neurosense_epoch{epoch:03d}_auc{val_auc_mean:.4f}.pth"
+
+# ─── Logging ───
+logging:
+  log_dir: "./logs"
+  log_every_n_steps: 10
+  # Weights & Biases (PRD Section 7)
+  wandb:
+    enabled: true
+    project: "neurosense"
+    entity: null  # Set to your wandb username
+    tags: ["huntington", "multimodal", "fusion"]
+
+# ─── Ablation Study (PRD Section 11) ───
+ablation:
+  conditions:
+    - name: "mri_only"
+      use_mri: true
+      use_clinical: false
+    - name: "clinical_only"
+      use_mri: false
+      use_clinical: true
+    - name: "genetic_only"
+      use_mri: false
+      use_clinical: false
+      use_cag_only: true
+    - name: "mri_clinical_concat"
+      use_mri: true
+      use_clinical: true
+      fusion: "concatenation"
+    - name: "full_neurosense"
+      use_mri: true
+      use_clinical: true
+      fusion: "cross_attention"
+  seeds: [42, 123, 456]
+  output_csv: "ablation_results.csv"
+  output_columns:
+    - "run_id"
+    - "condition"
+    - "seed"
+    - "auc_premanifest"
+    - "auc_early"
+    - "auc_advanced"
+    - "auc_mean"
+    - "f1_macro"
+    - "val_loss"
+
+# ─── Device Configuration ───
+device:
+  # Automatically selects CUDA if available, else CPU
+  auto_detect: true
+  # Force specific device (overrides auto_detect)
+  force: null  # "cuda:0", "cpu", or null
+
+# ─── Reproducibility ───
+reproducibility:
+  seed: 42
+  deterministic: true
+  benchmark: false

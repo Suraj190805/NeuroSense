@@ -1,0 +1,72 @@
+# ─── Python ───
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# ─── Virtual Environments ───
+venv/
+.venv/
+env/
+
+# ─── IDE ───
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ─── OS ───
+.DS_Store
+Thumbs.db
+
+# ─── Model Checkpoints (large files) ───
+*.pth
+*.pt
+*.ckpt
+checkpoints/
+saved_models/
+
+# ─── Data (never commit patient data) ───
+data/raw/
+data/processed/
+data/external/
+*.nii
+*.nii.gz
+
+# ─── Experiment Tracking ───
+wandb/
+mlruns/
+
+# ─── Outputs ───
+outputs/
+results/
+ablation_results.csv
+*.png
+*.jpg
+!frontend/public/**/*.png
+
+# ─── Frontend Build ───
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+
+# ─── API ───
+api/uploads/
+api/static/heatmaps/
+
+# ─── Notebooks ───
+.ipynb_checkpoints/
+
+# ─── Logs ───
+*.log
+logs/
+
+# ─── Environment Files ───
+.env
+.env.local
+.env.production

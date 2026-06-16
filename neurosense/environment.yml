@@ -1,0 +1,17 @@
+# NeuroSense — Conda Environment
+# Usage: conda env create -f environment.yml
+# Then:  conda activate neurosense
+
+name: neurosense
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.10
+  - pip
+  - cudatoolkit=11.8
+  - pip:
+    - -r requirements.txt

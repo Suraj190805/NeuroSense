@@ -64,7 +64,7 @@ progression:
 
 # ─── MRI Input Specifications (PRD 4.2.1) ───
 mri_input:
-  spatial_size: [96, 96, 96]  # Resampled to 96³
+  spatial_size: [48, 48, 48]  # Reduced from 96³ for lower memory usage
   voxel_spacing: [1.0, 1.0, 1.0]  # 1mm isotropic
   normalization: "zscore"  # Z-score per subject
   file_format: "nifti"  # .nii or .nii.gz

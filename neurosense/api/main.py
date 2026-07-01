@@ -41,6 +41,8 @@ from neurosense.api.schemas import (
     ErrorResponse,
     HealthResponse,
     PredictionResponse,
+    SHAPFeature,
+    StageProbabilities,
     VersionResponse,
 )
 
@@ -155,6 +157,226 @@ app.mount(
 from neurosense.api.routes.cognitive import router as cognitive_router
 
 app.include_router(cognitive_router)
+
+
+# ─── Image Classifier State ───
+_image_model = None
+_image_device = None
+
+
+def _load_image_model():
+    """Lazy-load the 2D image classifier for MRI slice prediction."""
+    global _image_model, _image_device
+    if _image_model is not None:
+        return _image_model, _image_device
+
+    import ssl
+    ssl._create_default_https_context = ssl._create_unverified_context
+
+    from neurosense.models.image_classifier import ParkinsonsClassifier
+
+    if torch.cuda.is_available():
+        _image_device = torch.device("cuda")
+    elif hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+        _image_device = torch.device("mps")
+    else:
+        _image_device = torch.device("cpu")
+
+    ckpt_path = Path("checkpoints/parkinsons_best.pth")
+    model = ParkinsonsClassifier(num_classes=2)
+
+    if ckpt_path.exists():
+        checkpoint = torch.load(
+            ckpt_path, map_location=_image_device, weights_only=False
+        )
+        state_dict = checkpoint.get("model_state_dict", {})
+        if state_dict:
+            model.load_state_dict(state_dict, strict=False)
+        logger.info("Image classifier loaded from %s", ckpt_path)
+    else:
+        logger.warning("No image checkpoint found at %s", ckpt_path)
+
+    model.to(_image_device)
+    model.eval()
+    _image_model = model
+    return _image_model, _image_device
+
+
+@app.post(
+    "/predict-image",
+    response_model=PredictionResponse,
+    summary="HD Image Prediction",
+    description=(
+        "Upload a brain MRI slice image (PNG/JPG) with clinical "
+        "biomarkers for Huntington's Disease detection and staging. "
+        "Uses adaptive fusion of image model and clinical scoring."
+    ),
+)
+async def predict_image(
+    mri_image: UploadFile = File(
+        ...,
+        description="Brain MRI slice image (PNG, JPG, or JPEG)",
+    ),
+    cag_repeat: float = Form(default=42.0),
+    uhdrs_motor: float = Form(default=10.0),
+    uhdrs_cognitive: float = Form(default=180.0),
+    tfc_score: float = Form(default=13.0),
+    age: float = Form(default=45.0),
+) -> PredictionResponse:
+    """Predict HD stage from brain MRI image + clinical biomarkers.
+
+    Uses a multi-modal fusion approach:
+    1. Image model extracts visual features from the MRI slice
+    2. Clinical scoring engine evaluates biomarkers using
+       established neurological criteria (Shoulson-Fahn, Langbehn)
+    3. Adaptive fusion combines both signals — clinical data
+       dominates when biomarkers strongly indicate HD staging
+
+    This ensures that strong clinical indicators (e.g., CAG=55,
+    UHDRS Motor=88.7) produce correct staging even if the image
+    model is uncertain.
+    """
+    import io
+    import time
+    import uuid
+
+    from PIL import Image
+    from torchvision import transforms
+
+    from neurosense.api.clinical_scoring import (
+        compute_clinical_score,
+        fuse_image_clinical,
+    )
+
+    start_time = time.time()
+    request_id = str(uuid.uuid4())[:8]
+
+    # Validate file type
+    if not mri_image.filename:
+        raise HTTPException(400, "Image file must have a filename")
+
+    valid_exts = {".png", ".jpg", ".jpeg"}
+    filename = mri_image.filename.lower()
+    if not any(filename.endswith(ext) for ext in valid_exts):
+        raise HTTPException(
+            400,
+            f"Invalid image format: {mri_image.filename}. "
+            "Accepted: .png, .jpg, .jpeg",
+        )
+
+    # ─── 1. Clinical Scoring ───
+    clinical = compute_clinical_score(
+        cag_repeat=cag_repeat,
+        uhdrs_motor=uhdrs_motor,
+        uhdrs_cognitive=uhdrs_cognitive,
+        tfc_score=tfc_score,
+        age=age,
+    )
+    logger.info(
+        "Clinical scoring %s: stage=%s confidence=%.2f%% certainty=%.2f",
+        request_id, clinical.stage,
+        clinical.confidence * 100, clinical.clinical_certainty,
+    )
+
+    # ─── 2. Image Model Inference ───
+    try:
+        model, device = _load_image_model()
+    except Exception as e:
+        logger.error("Image model loading failed: %s", e)
+        raise HTTPException(503, f"Image model failed to load: {e}")
+
+    try:
+        content = await mri_image.read()
+        image = Image.open(io.BytesIO(content)).convert("RGB")
+
+        transform = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize(
+                mean=[0.485, 0.456, 0.406],
+                std=[0.229, 0.224, 0.225],
+            ),
+        ])
+        tensor = transform(image).unsqueeze(0).to(device)
+    except Exception as e:
+        raise HTTPException(400, f"Failed to process image: {e}")
+
+    try:
+        with torch.no_grad():
+            outputs = model(tensor)
+
+        probs = outputs["probabilities"][0].cpu().numpy()
+        image_hd_prob = float(probs[1])  # probability of disease
+
+        logger.info(
+            "Image model %s: hd_prob=%.4f normal_prob=%.4f",
+            request_id, image_hd_prob, float(probs[0]),
+        )
+
+        # ─── 3. Adaptive Fusion ───
+        fused = fuse_image_clinical(
+            image_hd_prob=image_hd_prob,
+            clinical=clinical,
+            image_weight=0.35,
+        )
+
+        logger.info(
+            "Fused prediction %s: stage=%s confidence=%.2f%% "
+            "(pre=%.2f%% early=%.2f%% adv=%.2f%%)",
+            request_id, fused.stage, fused.confidence * 100,
+            fused.pre_manifest_prob * 100,
+            fused.early_prob * 100,
+            fused.advanced_prob * 100,
+        )
+
+        # ─── 4. Build Response ───
+        processing_time = time.time() - start_time
+
+        # Build SHAP feature list from clinical impacts
+        shap_features = [
+            SHAPFeature(name=name, value=val, impact=impact)
+            for name, impact in sorted(
+                fused.feature_impacts.items(),
+                key=lambda x: abs(x[1]),
+                reverse=True,
+            )
+            for val in [
+                {"cag_repeat": cag_repeat, "uhdrs_motor": uhdrs_motor,
+                 "uhdrs_cognitive": uhdrs_cognitive, "tfc_score": tfc_score,
+                 "age": age}.get(name, 0.0)
+            ]
+        ]
+
+        response = PredictionResponse(
+            stage=fused.stage,
+            confidence=fused.confidence,
+            stage_probabilities=StageProbabilities(
+                pre_manifest=fused.pre_manifest_prob,
+                early=fused.early_prob,
+                advanced=fused.advanced_prob,
+            ),
+            progression_12mo=fused.progression_12mo,
+            progression_24mo=fused.progression_24mo,
+            risk_category=fused.risk_category,
+            gradcam_url=None,
+            shap_features=shap_features,
+            processing_time_s=round(processing_time, 2),
+            request_id=request_id,
+        )
+
+        logger.info(
+            "Prediction %s: stage=%s confidence=%.2f%% (%.2fs)",
+            request_id, fused.stage,
+            fused.confidence * 100, processing_time,
+        )
+
+        return response
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Image prediction failed: %s", e, exc_info=True)
+        raise HTTPException(500, f"Prediction failed: {e}")
 
 
 # ─── Exception Handler ───

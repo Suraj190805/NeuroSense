@@ -35,7 +35,7 @@ from typing import Any
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.cuda.amp import GradScaler, autocast
+from torch.amp import GradScaler, autocast
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 
@@ -581,7 +581,8 @@ def train_neurosense(
 
     # ─── Mixed Precision ───
     scaler = GradScaler(
-        enabled=(mixed_precision and device.type == "cuda")
+        device.type,
+        enabled=(mixed_precision and device.type == "cuda"),
     )
 
     # ─── Early Stopping ───

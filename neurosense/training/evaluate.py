@@ -33,7 +33,7 @@ from typing import Any
 
 import numpy as np
 import torch
-from torch.cuda.amp import autocast
+from torch.amp import autocast
 from torch.utils.data import DataLoader
 
 from neurosense.data.dataset import STAGE_NAMES, HuntingtonDataset

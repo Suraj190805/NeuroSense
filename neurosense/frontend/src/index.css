@@ -75,6 +75,11 @@
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --dur: 0.3s;
+
+  /* Carousel Dimensions */
+  --hero-card-width: 420px;
+  --hero-card-height: 520px;
+  --hero-card-gap: 24px;
 }
 
 /* ── Dark Mode Theme ── */

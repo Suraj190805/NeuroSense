@@ -32,7 +32,6 @@ import numpy as np
 import torch
 import yaml
 from monai.transforms import (
-    AddChanneld,
     Compose,
     EnsureTyped,
     LoadImaged,
@@ -44,10 +43,8 @@ from monai.transforms import (
     RandScaleIntensityd,
     RandShiftIntensityd,
     Resized,
-    ScaleIntensityd,
     Spacingd,
     SpatialPadd,
-    ToTensord,
 )
 
 logger = logging.getLogger(__name__)
@@ -100,7 +97,7 @@ def load_config(config_path: str | Path | None = None) -> dict[str, Any]:
 
 
 def get_train_transforms(
-    spatial_size: tuple[int, int, int] = (96, 96, 96),
+    spatial_size: tuple[int, int, int] = (48, 48, 48),
     pixdim: tuple[float, float, float] = (1.0, 1.0, 1.0),
 ) -> Compose:
     """Build MONAI transform composition for training data.
@@ -217,7 +214,7 @@ def get_train_transforms(
 
 
 def get_val_transforms(
-    spatial_size: tuple[int, int, int] = (96, 96, 96),
+    spatial_size: tuple[int, int, int] = (48, 48, 48),
     pixdim: tuple[float, float, float] = (1.0, 1.0, 1.0),
 ) -> Compose:
     """Build MONAI transform composition for validation/test data.
@@ -507,7 +504,7 @@ class ClinicalNormalizer:
 def preprocess_single_mri(
     input_path: Path,
     output_path: Path,
-    spatial_size: tuple[int, int, int] = (96, 96, 96),
+    spatial_size: tuple[int, int, int] = (48, 48, 48),
     pixdim: tuple[float, float, float] = (1.0, 1.0, 1.0),
 ) -> bool:
     """Preprocess a single MRI NIfTI file.
@@ -561,7 +558,7 @@ def preprocess_single_mri(
 def preprocess_bids_dataset(
     input_dir: Path,
     output_dir: Path,
-    spatial_size: tuple[int, int, int] = (96, 96, 96),
+    spatial_size: tuple[int, int, int] = (48, 48, 48),
     pixdim: tuple[float, float, float] = (1.0, 1.0, 1.0),
     num_workers: int = 1,
 ) -> dict[str, int]:
@@ -664,7 +661,7 @@ def main() -> None:
         "--spatial-size",
         type=int,
         nargs=3,
-        default=[96, 96, 96],
+        default=[48, 48, 48],
         help="Target spatial dimensions (D H W), default: 96 96 96",
     )
     parser.add_argument(

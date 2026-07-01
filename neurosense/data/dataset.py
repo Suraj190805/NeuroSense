@@ -45,17 +45,47 @@ from neurosense.data.preprocessing import (
 
 logger = logging.getLogger(__name__)
 
+
+def _collate_fn(
+    batch: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Custom collate function for HD dataset batches.
+
+    Defined at module level so it can be pickled by
+    multiprocessing DataLoader workers.
+
+    Args:
+        batch: List of sample dicts from __getitem__.
+
+    Returns:
+        Batched dictionary with stacked tensors.
+    """
+    return {
+        "mri": torch.stack([s["mri"] for s in batch]),
+        "clinical": torch.stack(
+            [s["clinical"] for s in batch]
+        ),
+        "label": torch.tensor(
+            [s["label"] for s in batch],
+            dtype=torch.long,
+        ),
+        "subject_id": [s["subject_id"] for s in batch],
+    }
+
 # HD staging class labels (PRD Section 4.2.5)
 STAGE_LABELS: dict[str, int] = {
     "pre-manifest": 0,
     "pre_manifest": 0,
     "premanifest": 0,
+    "pre-symptomatic": 0,
     "control": 0,
     "early": 1,
     "early_hd": 1,
+    "middle": 2,
     "advanced": 2,
     "advanced_hd": 2,
     "manifest": 2,
+    "late": 2,
 }
 
 STAGE_NAMES: list[str] = ["pre-manifest", "early", "advanced"]
@@ -145,10 +175,12 @@ def _parse_participants_tsv(
                 "cag_repeat": [
                     "cag_repeat", "cag", "CAG",
                     "cag_count", "CAG_repeat",
+                    "HTT_CAG_Repeat_Length",
                 ],
                 "uhdrs_motor": [
                     "uhdrs_motor", "motor_score", "TMS",
                     "total_motor_score", "UHDRS_motor",
+                    "Chorea_Score",
                 ],
                 "uhdrs_cognitive": [
                     "uhdrs_cognitive", "cognitive_score",
@@ -157,6 +189,7 @@ def _parse_participants_tsv(
                 "tfc": [
                     "tfc", "tfc_score", "TFC",
                     "total_functional_capacity",
+                    "Functional_Capacity",
                 ],
                 "age": [
                     "age", "Age", "age_at_visit",
@@ -603,7 +636,7 @@ class HuntingtonDataset(Dataset):
             )
             # Return zero tensor as fallback
             mri_tensor = torch.zeros(
-                1, 96, 96, 96, dtype=torch.float32
+                1, 48, 48, 48, dtype=torch.float32
             )
 
         # Ensure correct shape [1, 96, 96, 96]
@@ -846,29 +879,6 @@ class HuntingtonDataset(Dataset):
         test_subset = Subset(test_dataset, test_indices)
 
         # ─── Create DataLoaders ───
-        def _collate_fn(
-            batch: list[dict[str, Any]],
-        ) -> dict[str, Any]:
-            """Custom collate function for HD dataset batches.
-
-            Args:
-                batch: List of sample dicts from __getitem__.
-
-            Returns:
-                Batched dictionary with stacked tensors.
-            """
-            return {
-                "mri": torch.stack([s["mri"] for s in batch]),
-                "clinical": torch.stack(
-                    [s["clinical"] for s in batch]
-                ),
-                "label": torch.tensor(
-                    [s["label"] for s in batch],
-                    dtype=torch.long,
-                ),
-                "subject_id": [s["subject_id"] for s in batch],
-            }
-
         train_loader = DataLoader(
             train_subset,
             batch_size=batch_size,

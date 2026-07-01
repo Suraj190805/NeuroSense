@@ -338,6 +338,8 @@ function Navbar() {
    ═══════════════════════════════════════════ */
 
 function HeroSection() {
+  const navigate = useNavigate();
+
   const features = [
     'MRI-Based Analysis',
     'Clinical Biomarkers',
@@ -351,76 +353,313 @@ function HeroSection() {
     { icon: '🏥', label: 'Clinical Workflow' },
   ];
 
+  const heroSlides = [
+    { src: '/hero-slide-1.png', alt: 'AI laboratory analyzing a glowing 3D brain with holographic dashboard', tag: 'AI Analysis', title: 'Deep Learning Brain Analysis', time: 'Real-time', link: '#analysis' },
+    { 
+      isFact: true, 
+      tag: 'Genetics', 
+      icon: '🧬', 
+      number: '50%', 
+      label: 'Inheritance Risk', 
+      description: "Huntington's is autosomal dominant. If a parent carries the defective HTT gene, each offspring has a 50% chance of inheriting the disease.",
+      footerText: '100% genetic penetrance',
+      link: '#about' 
+    },
+    { src: '/hero-slide-2.png', alt: 'Patient undergoing brain MRI scan with healthcare professionals monitoring', tag: 'MRI Scan', title: 'Advanced MRI Processing', time: '3D Volumetric', link: '#analysis' },
+    { 
+      isFact: true, 
+      tag: 'Prevalence', 
+      icon: '📊', 
+      number: '13 / 100k', 
+      label: 'Western Population', 
+      description: 'Over 30,000 individuals live with active symptoms in the US, with an additional 200,000 pre-symptomatic gene carriers at risk.',
+      footerText: 'Worldwide: ~2.7 per 100,000',
+      link: '#about' 
+    },
+    { src: '/hero-slide-3.png', alt: 'Neurologist examining brain MRI scans on holographic displays', tag: 'Diagnostics', title: 'Clinical Decision Support', time: 'Evidence-Based', link: '#how-it-works' },
+    { 
+      isFact: true, 
+      tag: 'Biomarkers', 
+      icon: '🔬', 
+      number: '≥36 CAG', 
+      label: 'Trinucleotide Repeats', 
+      description: 'A cytosine-adenine-guanine (CAG) repeat count of 36 or more in the HTT gene causes protein misfolding, leading to progressive neuronal loss.',
+      footerText: 'Higher counts correlate with earlier onset',
+      link: '#about' 
+    },
+    { src: '/hero-slide-4.png', alt: 'Doctor consulting patient about brain scan results', tag: 'Patient Care', title: 'Actionable Insights for Clinicians', time: 'Personalized', link: '/memory-test' },
+    { 
+      isFact: true, 
+      tag: 'Progression', 
+      icon: '⏳', 
+      number: '15-20 Yrs', 
+      label: 'Post-Onset Timeline', 
+      description: 'A progressive disorder causing gradual decline in motor, cognitive, and mental functions, typically starting between ages 30-50.',
+      footerText: 'Early AI detection aids therapeutic planning',
+      link: '#about' 
+    },
+    { src: '/hero-slide-5.png', alt: 'Disease progression visualization from healthy to Huntington\'s stages', tag: 'Progression', title: 'HD Stage Classification', time: '3-Stage Model', link: '#about' },
+    { src: '/hero-slide-6.png', alt: 'AI healthcare platform with holographic brain model and analytics', tag: 'Platform', title: 'Explainable AI Dashboard', time: 'Transparent', link: '#how-it-works' },
+  ];
+
+  const handleExplore = (link) => {
+    if (link.startsWith('#')) {
+      const id = link.substring(1);
+      document.getElementById(id)?.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      navigate(link);
+    }
+  };
+
+  const numSlides = heroSlides.length;
+  const prefixCount = 2;
+  const suffixCount = 2;
+  const paddedSlides = [
+    ...heroSlides.slice(-prefixCount),
+    ...heroSlides,
+    ...heroSlides.slice(0, suffixCount),
+  ];
+
+  const [currentIndex, setCurrentIndex] = useState(2); // Start at S0 (index 2)
+  const [isTransitioning, setIsTransitioning] = useState(true);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragStartX, setDragStartX] = useState(0);
+  const [dragOffset, setDragOffset] = useState(0);
+
+  // Logical index for dots and matching active state
+  const logicalIndex = (currentIndex - prefixCount + numSlides) % numSlides;
+
+  // Auto-advance carousel
+  useEffect(() => {
+    if (isDragging) return;
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => prev + 1);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [isDragging]);
+
+  // Restore transition mode after instant jump
+  useEffect(() => {
+    if (!isTransitioning) {
+      const raf = requestAnimationFrame(() => {
+        setIsTransitioning(true);
+      });
+      return () => cancelAnimationFrame(raf);
+    }
+  }, [isTransitioning]);
+
+  const handlePrev = () => {
+    if (currentIndex <= 0) return;
+    setIsTransitioning(true);
+    setCurrentIndex((prev) => prev - 1);
+  };
+
+  const handleNext = () => {
+    if (currentIndex >= paddedSlides.length - 1) return;
+    setIsTransitioning(true);
+    setCurrentIndex((prev) => prev + 1);
+  };
+
+  const handleTransitionEnd = () => {
+    if (currentIndex <= 1) {
+      setIsTransitioning(false);
+      setCurrentIndex(currentIndex + numSlides);
+    } else if (currentIndex >= numSlides + prefixCount) {
+      setIsTransitioning(false);
+      setCurrentIndex(currentIndex - numSlides);
+    }
+  };
+
+  // Drag handlers
+  const handleDragStart = (e) => {
+    setIsDragging(true);
+    setDragStartX(e.type === 'touchstart' ? e.touches[0].clientX : e.clientX);
+    setDragOffset(0);
+  };
+
+  const handleDragMove = (e) => {
+    if (!isDragging) return;
+    const currentX = e.type === 'touchmove' ? e.touches[0].clientX : e.clientX;
+    setDragOffset(currentX - dragStartX);
+  };
+
+  const handleDragEnd = () => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    const threshold = 60;
+    if (dragOffset < -threshold) {
+      handleNext();
+    } else if (dragOffset > threshold) {
+      handlePrev();
+    }
+    setDragOffset(0);
+  };
+
   return (
     <section className="hero" id="hero">
-      <div className="hero-inner">
-        <div className="hero-content">
-          <div className="hero-badge">
-            🔬 AI-Powered Neuroscience Research
-          </div>
-          <h1 className="hero-title">
-            Early Detection of{' '}
-            <span className="highlight">Huntington's Disease</span>{' '}
-            Through AI
-          </h1>
-          <p className="hero-description">
-            NeuroSense combines 3D brain MRI analysis with clinical biomarkers
-            using deep learning to enable early HD detection, stage classification,
-            and 12/24-month progression forecasting — giving clinicians actionable
-            insights before symptoms fully manifest.
-          </p>
+      {/* ─── Coverflow Card Carousel ─── */}
+      <div
+        className="hero-carousel-fullwidth"
+        onMouseDown={handleDragStart}
+        onMouseMove={handleDragMove}
+        onMouseUp={handleDragEnd}
+        onMouseLeave={handleDragEnd}
+        onTouchStart={handleDragStart}
+        onTouchMove={handleDragMove}
+        onTouchEnd={handleDragEnd}
+      >
+        <div
+          className="hero-carousel-track"
+          style={{
+            transform: `translateX(calc(50% - (var(--hero-card-width) / 2) - (${currentIndex} * (var(--hero-card-width) + var(--hero-card-gap))) + ${dragOffset}px))`,
+            transition: (!isTransitioning || isDragging) ? 'none' : 'transform 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+          }}
+          onTransitionEnd={handleTransitionEnd}
+        >
+          {paddedSlides.map((slide, i) => {
+            const isCenter = i === currentIndex;
+            const scale = isCenter ? 1 : 0.9;
+            const opacity = isCenter ? 1 : 0.6;
 
-          {/* Feature checklist */}
-          <div className="hero-features">
-            {features.map((feature, i) => (
-              <div className="hero-feature" key={i} style={{ animationDelay: `${0.4 + i * 0.08}s` }}>
-                <span className="hero-feature-check">✓</span>
-                <span>{feature}</span>
+            return (
+              <div
+                key={i}
+                className={`hero-card hero-carousel-card ${slide.isFact ? 'hero-fact-card' : ''} ${isCenter ? 'active' : ''}`}
+                style={{
+                  transform: `scale(${scale})`,
+                  opacity,
+                  transition: isDragging ? 'none' : 'transform 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94), opacity 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
+                }}
+                onClick={() => {
+                  if (isCenter) {
+                    handleExplore(slide.link);
+                  } else {
+                    setCurrentIndex(i);
+                  }
+                }}
+              >
+                <div className="hero-card-tag">{slide.tag}</div>
+                {slide.isFact ? (
+                  <div className="hero-fact-card-content">
+                    <div className="hero-fact-icon">{slide.icon}</div>
+                    <div className="hero-fact-number">{slide.number}</div>
+                    <div className="hero-fact-label">{slide.label}</div>
+                    <p className="hero-fact-description">{slide.description}</p>
+                    <div className="hero-fact-footer">{slide.footerText}</div>
+                  </div>
+                ) : (
+                  <>
+                    <img src={slide.src} alt={slide.alt} className="hero-card-img" draggable="false" />
+                    <div className="hero-card-overlay">
+                      <h3 className="hero-card-title">{slide.title}</h3>
+                      <span className="hero-card-time">{slide.time}</span>
+                    </div>
+                  </>
+                )}
+                <div
+                  className="hero-card-readmore"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleExplore(slide.link);
+                  }}
+                >
+                  <span className="hero-card-readmore-icon">→</span>
+                  <span>Explore</span>
+                </div>
               </div>
-            ))}
-          </div>
-
-          <div className="hero-actions">
-            <a href="#analysis" className="btn btn-primary hero-btn" onClick={(e) => { e.preventDefault(); document.getElementById('analysis')?.scrollIntoView({ behavior: 'smooth' }); }}>
-              <span className="btn-icon">🔬</span>
-              Start Analysis
-              <span className="btn-arrow">→</span>
-            </a>
-            <a href="#about" className="btn btn-secondary hero-btn" onClick={(e) => { e.preventDefault(); document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' }); }}>
-              Learn About HD
-            </a>
-          </div>
-
-          {/* Trust badges */}
-          <div className="hero-trust">
-            {trustBadges.map((badge, i) => (
-              <div className="hero-trust-badge" key={i} style={{ animationDelay: `${0.7 + i * 0.1}s` }}>
-                <span className="hero-trust-icon">{badge.icon}</span>
-                <span className="hero-trust-label">{badge.label}</span>
-              </div>
-            ))}
-          </div>
-
-          <div className="hero-stats">
-            <div className="hero-stat">
-              <div className="hero-stat-value">≥87%</div>
-              <div className="hero-stat-label">Target AUC-ROC</div>
-            </div>
-            <div className="hero-stat">
-              <div className="hero-stat-value">3-Stage</div>
-              <div className="hero-stat-label">HD Classification</div>
-            </div>
-            <div className="hero-stat">
-              <div className="hero-stat-value">24-Mo</div>
-              <div className="hero-stat-label">Progression Forecast</div>
-            </div>
-          </div>
+            );
+          })}
         </div>
-        <div className="hero-image">
-          <div className="hero-ring" />
-          <div className="hero-ring hero-ring-2" />
-          <div className="hero-glow" />
-          <img src="/hero-brain.png" alt="3D visualization of a human brain with neural pathways highlighted" />
+
+        {/* Progress dots */}
+        <div className="hero-carousel-dots">
+          {heroSlides.map((_, i) => (
+            <button
+              key={i}
+              className={`hero-carousel-dot ${i === logicalIndex ? 'active' : ''}`}
+              onClick={() => {
+                setIsTransitioning(true);
+                setCurrentIndex(i + prefixCount);
+              }}
+              aria-label={`Go to slide ${i + 1}`}
+            />
+          ))}
+        </div>
+
+        {/* Navigation arrows */}
+        <button
+          className="hero-carousel-arrow hero-carousel-arrow-left"
+          onClick={handlePrev}
+          aria-label="Previous slide"
+        >‹</button>
+        <button
+          className="hero-carousel-arrow hero-carousel-arrow-right"
+          onClick={handleNext}
+          aria-label="Next slide"
+        >›</button>
+      </div>
+
+      {/* ─── Hero Text Content (centered below carousel) ─── */}
+      <div className="hero-text-below">
+        <div className="hero-badge">
+          🔬 AI-Powered Neuroscience Research
+        </div>
+        <h1 className="hero-title">
+          Early Detection of{' '}
+          <span className="highlight">Huntington's Disease</span>{' '}
+          Through AI
+        </h1>
+        <p className="hero-description">
+          NeuroSense combines 3D brain MRI analysis with clinical biomarkers
+          using deep learning to enable early HD detection, stage classification,
+          and 12/24-month progression forecasting — giving clinicians actionable
+          insights before symptoms fully manifest.
+        </p>
+
+        {/* Feature checklist */}
+        <div className="hero-features">
+          {features.map((feature, i) => (
+            <div className="hero-feature" key={i} style={{ animationDelay: `${0.4 + i * 0.08}s` }}>
+              <span className="hero-feature-check">✓</span>
+              <span>{feature}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="hero-actions">
+          <a href="#analysis" className="btn btn-primary hero-btn" onClick={(e) => { e.preventDefault(); document.getElementById('analysis')?.scrollIntoView({ behavior: 'smooth' }); }}>
+            <span className="btn-icon">🔬</span>
+            Start Analysis
+            <span className="btn-arrow">→</span>
+          </a>
+          <a href="#about" className="btn btn-secondary hero-btn" onClick={(e) => { e.preventDefault(); document.getElementById('about')?.scrollIntoView({ behavior: 'smooth' }); }}>
+            Learn About HD
+          </a>
+        </div>
+
+        {/* Trust badges */}
+        <div className="hero-trust">
+          {trustBadges.map((badge, i) => (
+            <div className="hero-trust-badge" key={i} style={{ animationDelay: `${0.7 + i * 0.1}s` }}>
+              <span className="hero-trust-icon">{badge.icon}</span>
+              <span className="hero-trust-label">{badge.label}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="hero-stats">
+          <div className="hero-stat">
+            <div className="hero-stat-value">≥87%</div>
+            <div className="hero-stat-label">Target AUC-ROC</div>
+          </div>
+          <div className="hero-stat">
+            <div className="hero-stat-value">3-Stage</div>
+            <div className="hero-stat-label">HD Classification</div>
+          </div>
+          <div className="hero-stat">
+            <div className="hero-stat-value">24-Mo</div>
+            <div className="hero-stat-label">Progression Forecast</div>
+          </div>
         </div>
       </div>
     </section>
@@ -606,10 +845,10 @@ function ClinicalForm({ onSubmit, isLoading }) {
   const handleFile = (file) => {
     setFileError(null);
     if (!file) { setMriFile(null); return; }
-    const validExts = ['.nii', '.nii.gz', '.gz'];
+    const validExts = ['.nii', '.nii.gz', '.gz', '.png', '.jpg', '.jpeg'];
     const name = file.name.toLowerCase();
     if (!validExts.some((ext) => name.endsWith(ext))) {
-      setFileError('Invalid format. Please upload a NIfTI file (.nii, .nii.gz)');
+      setFileError('Invalid format. Please upload a brain MRI image (.png, .jpg) or NIfTI file (.nii, .nii.gz)');
       return;
     }
     if (file.size > MAX_FILE_SIZE_MB * 1e6) {
@@ -685,7 +924,7 @@ function ClinicalForm({ onSubmit, isLoading }) {
         >
           <input
             type="file"
-            accept=".nii,.nii.gz,.gz"
+            accept=".nii,.nii.gz,.gz,.png,.jpg,.jpeg"
             onChange={(e) => handleFile(e.target.files?.[0] || null)}
           />
           {mriFile ? (
@@ -695,7 +934,7 @@ function ClinicalForm({ onSubmit, isLoading }) {
                 <strong>{mriFile.name}</strong>
               </p>
               <p className="file-drop-meta">
-                {(mriFile.size / 1e6).toFixed(1)} MB • NIfTI format
+                {(mriFile.size / 1e6).toFixed(1)} MB • {mriFile.name.match(/\.(png|jpg|jpeg)$/i) ? 'Brain MRI Image' : 'NIfTI format'}
               </p>
               <button
                 type="button"
@@ -709,9 +948,9 @@ function ClinicalForm({ onSubmit, isLoading }) {
             <>
               <div className="file-drop-icon">{dragOver ? '📂' : '🧠'}</div>
               <p className="file-drop-text">
-                {dragOver ? 'Drop file here' : <>Drop MRI or <strong>browse</strong></>}
+                {dragOver ? 'Drop file here' : <>Drop Brain MRI or <strong>browse</strong></>}
               </p>
-              <p className="file-drop-hint">NIfTI format (.nii, .nii.gz) • Max {MAX_FILE_SIZE_MB} MB • Optional</p>
+              <p className="file-drop-hint">Brain MRI image (.png, .jpg) or NIfTI (.nii, .nii.gz) • Max {MAX_FILE_SIZE_MB} MB</p>
             </>
           )}
         </div>
@@ -2323,13 +2562,15 @@ function DatasetSection() {
    ═══════════════════════════════════════════ */
 
 function AIWorkflowSection() {
-  const nodes = [
-    { id: 'mri', label: 'MRI Input', sub: '128³ voxels', icon: '🧠', row: 0 },
-    { id: 'resnet', label: '3D ResNet-50', sub: 'Feature extraction', icon: '🔲', row: 0 },
-    { id: 'fusion', label: 'Cross-Attention', sub: 'Multi-modal fusion', icon: '🔗', row: 0 },
-    { id: 'output', label: 'Predictions', sub: 'Stage + Forecast', icon: '📊', row: 0 },
-    { id: 'clinical', label: 'Clinical Data', sub: '5 biomarkers', icon: '📋', row: 1 },
-    { id: 'bilstm', label: 'Bi-LSTM', sub: 'Temporal encoding', icon: '⚡', row: 1 },
+  const topNodes = [
+    { id: 'mri', label: 'MRI Input', sub: '128³ voxels', icon: '🧠' },
+    { id: 'resnet', label: '3D ResNet-50', sub: 'Feature extraction', icon: '🔲' },
+    { id: 'fusion', label: 'Cross-Attention', sub: 'Multi-modal fusion', icon: '🔗' },
+    { id: 'output', label: 'Predictions', sub: 'Stage + Forecast', icon: '📊' },
+  ];
+  const bottomNodes = [
+    { id: 'clinical', label: 'Clinical Data', sub: '5 biomarkers', icon: '📋' },
+    { id: 'bilstm', label: 'Bi-LSTM', sub: 'Temporal encoding', icon: '⚡' },
   ];
 
   return (
@@ -2341,11 +2582,23 @@ function AIWorkflowSection() {
           Dual-stream architecture with cross-modal attention fusion for robust HD prediction.
         </p>
         <div className="workflow-diagram reveal">
+          {/* Top row: MRI stream */}
           <div className="workflow-row">
-            {nodes.filter(n => n.row === 0).map((node, i) => (
+            {topNodes.map((node, i) => (
               <Fragment key={node.id}>
-                {i > 0 && <div className="workflow-arrow">→</div>}
-                <div className="workflow-node">
+                {i > 0 && (
+                  <div className="workflow-connector">
+                    <svg viewBox="0 0 40 20" className="workflow-svg-arrow">
+                      <defs>
+                        <marker id={`arrowH-${i}`} markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                          <path d="M0,0 L8,4 L0,8" fill="var(--accent)" />
+                        </marker>
+                      </defs>
+                      <line x1="0" y1="10" x2="32" y2="10" stroke="var(--accent)" strokeWidth="2" markerEnd={`url(#arrowH-${i})`} strokeDasharray="4 3" className="workflow-line-anim" />
+                    </svg>
+                  </div>
+                )}
+                <div className={`workflow-node ${node.id === 'fusion' ? 'workflow-node-fusion' : ''}`}>
                   <div className="workflow-node-icon">{node.icon}</div>
                   <div className="workflow-node-label">{node.label}</div>
                   <div className="workflow-node-sub">{node.sub}</div>
@@ -2353,18 +2606,39 @@ function AIWorkflowSection() {
               </Fragment>
             ))}
           </div>
-          <div className="workflow-row workflow-row-bottom">
-            {nodes.filter(n => n.row === 1).map((node, i) => (
-              <Fragment key={node.id}>
-                {i > 0 && <div className="workflow-arrow">→</div>}
-                <div className="workflow-node">
-                  <div className="workflow-node-icon">{node.icon}</div>
-                  <div className="workflow-node-label">{node.label}</div>
-                  <div className="workflow-node-sub">{node.sub}</div>
-                </div>
-              </Fragment>
-            ))}
-            <div className="workflow-arrow workflow-arrow-up">↑</div>
+
+          {/* Bottom row: Clinical stream + merge connector */}
+          <div className="workflow-bottom-area">
+            <div className="workflow-row workflow-row-bottom">
+              {bottomNodes.map((node, i) => (
+                <Fragment key={node.id}>
+                  {i > 0 && (
+                    <div className="workflow-connector">
+                      <svg viewBox="0 0 40 20" className="workflow-svg-arrow">
+                        <defs>
+                          <marker id={`arrowHB-${i}`} markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto">
+                            <path d="M0,0 L8,4 L0,8" fill="var(--accent)" />
+                          </marker>
+                        </defs>
+                        <line x1="0" y1="10" x2="32" y2="10" stroke="var(--accent)" strokeWidth="2" markerEnd={`url(#arrowHB-${i})`} strokeDasharray="4 3" className="workflow-line-anim" />
+                      </svg>
+                    </div>
+                  )}
+                  <div className={`workflow-node ${node.id === 'bilstm' ? 'workflow-node-fusion' : ''}`}>
+                    <div className="workflow-node-icon">{node.icon}</div>
+                    <div className="workflow-node-label">{node.label}</div>
+                    <div className="workflow-node-sub">{node.sub}</div>
+                  </div>
+                </Fragment>
+              ))}
+            </div>
+
+            {/* CSS-based L-connector: Bi-LSTM → Cross-Attention */}
+            <div className="workflow-merge-line">
+              <div className="workflow-merge-vert"></div>
+              <div className="workflow-merge-horiz"></div>
+              <div className="workflow-merge-arrow">▲</div>
+            </div>
           </div>
         </div>
       </div>
@@ -2394,11 +2668,11 @@ function FAQSection() {
       <div className="section-inner">
         <div className="section-label reveal">Common Questions</div>
         <h2 className="section-title reveal">Frequently Asked Questions</h2>
-        <div className="faq-list">
+        <div className="faq-list reveal">
           {faqs.map((faq, i) => (
             <div
               key={i}
-              className={`faq-item reveal ${openIndex === i ? 'open' : ''}`}
+              className={`faq-item ${openIndex === i ? 'open' : ''}`}
               onClick={() => setOpenIndex(openIndex === i ? null : i)}
             >
               <div className="faq-question">
@@ -2838,9 +3112,22 @@ function HomePage() {
       fd.append('uhdrs_cognitive', form.uhdrs_cognitive);
       fd.append('tfc_score', form.tfc_score);
       fd.append('age', form.age);
-      if (mriFile) fd.append('mri_file', mriFile);
 
-      const res = await fetch(`${API_BASE}/predict`, { method: 'POST', body: fd });
+      // Route to the correct endpoint based on file type
+      let endpoint = '/predict';
+      if (mriFile) {
+        const fname = mriFile.name.toLowerCase();
+        if (fname.endsWith('.png') || fname.endsWith('.jpg') || fname.endsWith('.jpeg')) {
+          // Image file → use image prediction endpoint
+          fd.append('mri_image', mriFile);
+          endpoint = '/predict-image';
+        } else {
+          // NIfTI file → use original endpoint
+          fd.append('mri_file', mriFile);
+        }
+      }
+
+      const res = await fetch(`${API_BASE}${endpoint}`, { method: 'POST', body: fd });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));

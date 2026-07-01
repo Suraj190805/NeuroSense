@@ -282,7 +282,7 @@ their respective data use agreements.
 
 ## 👤 Author
 
-**Suraj** — SJC Institute of Technology, 2025–2026
+**Suraj S** 
 
 ---
 

@@ -23,6 +23,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import os
 import sys
 import time
 import uuid
@@ -30,6 +31,13 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:
+    pass
 
 import torch
 from bson import ObjectId

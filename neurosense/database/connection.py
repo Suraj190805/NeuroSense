@@ -27,6 +27,13 @@ import os
 
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv()
+except ImportError:
+    pass
+
 logger = logging.getLogger(__name__)
 
 # ─── Configuration ───
@@ -54,24 +61,33 @@ async def connect_db() -> None:
     global _client, _database
 
     try:
-        # Use certifi CA bundle for SSL (fixes macOS certificate issues)
-        import certifi
+        uri = os.getenv("MONGODB_URI", MONGODB_URI)
+        db_name = os.getenv("MONGODB_DB_NAME", MONGODB_DB_NAME)
 
-        _client = AsyncIOMotorClient(
-            MONGODB_URI,
-            tlsCAFile=certifi.where(),
-            serverSelectionTimeoutMS=4000,
-            connectTimeoutMS=4000,
-            socketTimeoutMS=4000,
-        )
-        _database = _client[MONGODB_DB_NAME]
+        client_kwargs = {
+            "serverSelectionTimeoutMS": 4000,
+            "connectTimeoutMS": 4000,
+            "socketTimeoutMS": 4000,
+        }
+
+        # Apply TLS/certifi only when connecting over TLS / mongodb+srv
+        if "mongodb+srv" in uri or "ssl=true" in uri.lower() or "tls=true" in uri.lower():
+            try:
+                import certifi
+
+                client_kwargs["tlsCAFile"] = certifi.where()
+            except ImportError:
+                pass
+
+        _client = AsyncIOMotorClient(uri, **client_kwargs)
+        _database = _client[db_name]
 
         # Verify connection
         await _client.admin.command("ping")
         logger.info(
             "MongoDB connected — uri=%s db=%s",
-            MONGODB_URI,
-            MONGODB_DB_NAME,
+            uri.split("@")[-1] if "@" in uri else uri,
+            db_name,
         )
 
         # Create indexes

@@ -24,31 +24,50 @@ from __future__ import annotations
 
 import logging
 import os
+from pathlib import Path
 
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 
+# ─── Load Environment Variables ───
 try:
     from dotenv import load_dotenv
 
-    load_dotenv()
+    _env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+    if _env_path.exists():
+        load_dotenv(dotenv_path=_env_path, override=True)
+    else:
+        load_dotenv(override=True)
 except ImportError:
     pass
 
 logger = logging.getLogger(__name__)
 
-# ─── Configuration ───
-MONGODB_URI = os.getenv(
-    "MONGODB_URI",
-    "mongodb://localhost:27017",
-)
-MONGODB_DB_NAME = os.getenv("MONGODB_DB_NAME", "neurosense")
-
 # ─── Global State ───
 _client: AsyncIOMotorClient | None = None
 _database: AsyncIOMotorDatabase | None = None
+_connected_uri: str | None = None
 
 
-async def connect_db() -> None:
+def _get_target_config() -> tuple[str, str]:
+    """Retrieve current MongoDB URI and DB name from environment."""
+    try:
+        from dotenv import load_dotenv
+
+        _env_path = Path(__file__).resolve().parent.parent.parent / ".env"
+        if _env_path.exists():
+            load_dotenv(dotenv_path=_env_path, override=True)
+    except ImportError:
+        pass
+
+    uri = os.getenv(
+        "MONGODB_URI",
+        "mongodb://localhost:27017",
+    )
+    db_name = os.getenv("MONGODB_DB_NAME", "neurosense")
+    return uri, db_name
+
+
+async def connect_db(force: bool = False) -> None:
     """Initialize the MongoDB connection and create indexes.
 
     Connects the Motor async client and sets up collection
@@ -58,16 +77,29 @@ async def connect_db() -> None:
     Raises:
         ConnectionError: If MongoDB is unreachable.
     """
-    global _client, _database
+    global _client, _database, _connected_uri
+
+    uri, db_name = _get_target_config()
+
+    # Skip reconnect if already connected to the same URI unless forced
+    if not force and _database is not None and _connected_uri == uri:
+        return
+
+    # Close previous client if URI changed
+    if _client is not None:
+        try:
+            _client.close()
+        except Exception:
+            pass
+        _client = None
+        _database = None
+        _connected_uri = None
 
     try:
-        uri = os.getenv("MONGODB_URI", MONGODB_URI)
-        db_name = os.getenv("MONGODB_DB_NAME", MONGODB_DB_NAME)
-
         client_kwargs = {
-            "serverSelectionTimeoutMS": 4000,
-            "connectTimeoutMS": 4000,
-            "socketTimeoutMS": 4000,
+            "serverSelectionTimeoutMS": 6000,
+            "connectTimeoutMS": 6000,
+            "socketTimeoutMS": 6000,
         }
 
         # Apply TLS/certifi only when connecting over TLS / mongodb+srv
@@ -79,14 +111,20 @@ async def connect_db() -> None:
             except ImportError:
                 pass
 
-        _client = AsyncIOMotorClient(uri, **client_kwargs)
-        _database = _client[db_name]
+        new_client = AsyncIOMotorClient(uri, **client_kwargs)
+        new_db = new_client[db_name]
 
         # Verify connection
-        await _client.admin.command("ping")
+        await new_client.admin.command("ping")
+
+        _client = new_client
+        _database = new_db
+        _connected_uri = uri
+
+        masked_host = uri.split("@")[-1] if "@" in uri else uri
         logger.info(
-            "MongoDB connected — uri=%s db=%s",
-            uri.split("@")[-1] if "@" in uri else uri,
+            "MongoDB connected successfully — host=%s db=%s",
+            masked_host,
             db_name,
         )
 
@@ -97,6 +135,7 @@ async def connect_db() -> None:
         logger.error("MongoDB connection failed: %s", e)
         _client = None
         _database = None
+        _connected_uri = None
         raise ConnectionError(f"Failed to connect to MongoDB: {e}") from e
 
 
@@ -105,7 +144,7 @@ async def close_db() -> None:
 
     Should be called during application shutdown.
     """
-    global _client, _database
+    global _client, _database, _connected_uri
 
     if _client is not None:
         _client.close()
@@ -113,6 +152,7 @@ async def close_db() -> None:
 
     _client = None
     _database = None
+    _connected_uri = None
 
 
 def get_database() -> AsyncIOMotorDatabase:
@@ -146,8 +186,10 @@ async def ensure_connected() -> bool:
     Returns:
         True if connected or reconnected successfully, False otherwise.
     """
-    global _client, _database
-    if _database is not None:
+    global _client, _database, _connected_uri
+    uri, _ = _get_target_config()
+
+    if _database is not None and _connected_uri == uri:
         return True
     try:
         await connect_db()

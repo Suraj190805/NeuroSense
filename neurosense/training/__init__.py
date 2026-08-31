@@ -23,10 +23,12 @@ from neurosense.training.losses import (
     WeightedCrossEntropyLoss,
 )
 from neurosense.training.train import train_neurosense
+from neurosense.training.train_image import train_hd_image
 
 __all__ = [
     # Training pipeline
     "train_neurosense",
+    "train_hd_image",
     # Evaluation
     "evaluate_model",
     # Ablation

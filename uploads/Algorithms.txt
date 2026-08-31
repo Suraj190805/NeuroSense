@@ -1,0 +1,214 @@
+================================================================================
+                    NEUROSENSE — ALGORITHM & MODEL ARCHITECTURE SPECIFICATION
+================================================================================
+Project: NeuroSense (Multimodal AI Platform for Huntington's Disease Detection, Staging & Progression)
+Target: Comprehensive reference of all machine learning, deep learning, explainability,
+        statistical, and clinical assessment algorithms implemented across the project.
+================================================================================
+
+--------------------------------------------------------------------------------
+1. 3D RESNET-50 (3D CONVOLUTIONAL NEURAL NETWORK)
+--------------------------------------------------------------------------------
+• WHERE USED:
+  - neurosense/models/mri_encoder.py
+  - neurosense/models/classifier.py
+
+• HOW IT WORKS:
+  - Extends standard 2D residual networks to 3D spatial convolutions (Conv3d, BatchNorm3d, ReLU).
+  - Processes full 3D volumetric T1-weighted structural MRI scans (NIfTI format, 96×96×96 or 128×128×128 voxels).
+  - Comprises 4 bottleneck residual blocks (layer1 to layer4) with shortcut identity connections that mitigate vanishing gradients.
+  - Generates a rich 2048-dimensional dense spatial feature embedding via 3D Adaptive Average Pooling.
+
+• WHY WE USED IT:
+  - Huntington's Disease is characterized by complex 3D neurodegeneration (atrophy of the caudate nucleus, putamen/striatum, and lateral ventricular enlargement) that cannot be accurately captured by 2D slices alone.
+  - 3D ResNet preserves continuous inter-slice spatial context, volumetric depth, and anatomical symmetries across coronal, sagittal, and axial planes.
+
+
+--------------------------------------------------------------------------------
+2. 2D RESNET-50 WITH TRANSFER LEARNING (MRI SLICE CLASSIFIER)
+--------------------------------------------------------------------------------
+• WHERE USED:
+  - neurosense/models/image_classifier.py
+  - neurosense/api/main.py (Endpoint: /predict-image)
+
+• HOW IT WORKS:
+  - Utilizes an ImageNet-pretrained 2D ResNet-50 backbone with fine-tuned top layers.
+  - Replaces final 1000-class fully-connected layer with a custom medical classification head:
+    Linear(2048 → 512) → ReLU → Dropout(p=0.3) → Linear(512 → 2/3 classes).
+  - Processes standard 2D brain MRI slice images (.png, .jpg, .jpeg) normalized to 224×224 pixels.
+
+• WHY WE USED IT:
+  - Enables instant, browser-based, at-home screening for patients and families who only possess exported 2D slice images or hospital scan photographs rather than specialized 3D NIfTI volumes.
+  - Transfer learning prevents overfitting on smaller medical image cohorts while providing high visual discriminative power.
+
+
+--------------------------------------------------------------------------------
+3. BIDIRECTIONAL LONG SHORT-TERM MEMORY (BI-LSTM)
+--------------------------------------------------------------------------------
+• WHERE USED:
+  - neurosense/models/clinical_encoder.py
+  - neurosense/models/classifier.py
+
+• HOW IT WORKS:
+  - 2-layer Bidirectional Recurrent Neural Network (LSTM) with hidden dimension 128/256.
+  - Operates on longitudinal clinical/digital assessment sequences [Batch, Time_Steps, 5]:
+    1. CAG Trinucleotide Repeat Count (genetic marker)
+    2. Motor Assessment Score (0–100%)
+    3. Memory & Cognitive Score (0–100%)
+    4. Daily Functional Independence Capacity (0–100%)
+    5. Patient Age (years)
+  - Processes sequences forward in time (past → future trajectory) and backward (future context), concatenating both hidden state vectors.
+
+• WHY WE USED IT:
+  - Huntington's Disease is progressive and dynamic; symptom decline is non-linear.
+  - Bi-LSTM captures velocity, acceleration, and inflection points of functional and motor decline across sequential patient visits, outperforming static feedforward networks.
+
+
+--------------------------------------------------------------------------------
+4. CROSS-MODAL MULTI-HEAD ATTENTION FUSION
+--------------------------------------------------------------------------------
+• WHERE USED:
+  - neurosense/models/fusion.py
+  - neurosense/models/classifier.py
+
+• HOW IT WORKS:
+  - Implements scaled dot-product cross-attention: Attention(Q, K, V) = softmax((Q · K^T) / sqrt(d_k)) · V.
+  - Bidirectional Cross-Modal Streams:
+    a) Visual Query (MRI) attends to Key/Value of Clinical Assessment stream.
+    b) Clinical Query attends to Key/Value of MRI Spatial Representation stream.
+  - The outputs are fused via gated residual connections and layer normalization into a joint multimodal embedding vector.
+
+• WHY WE USED IT:
+  - Multi-modal synergy: Brain atrophy visible on MRI often precedes motor symptoms, while cognitive and functional tests reflect real-world disability.
+  - Cross-attention learns inter-modal dependencies—such as correlating striatal volume reduction directly with specific motor and memory deficits—yielding significantly higher staging accuracy than simple concatenation or early fusion.
+
+
+--------------------------------------------------------------------------------
+5. GRADCAM++ (3D & 2D GENERALIZED GRADIENT-WEIGHTED CLASS ACTIVATION MAPPING)
+--------------------------------------------------------------------------------
+• WHERE USED:
+  - neurosense/explainability/gradcam.py (GradCAM3D and GradCAM2D)
+  - neurosense/explainability/visualise.py
+  - neurosense/api/main.py & inference.py
+
+• HOW IT WORKS:
+  - Computes higher-order (2nd and 3rd order) partial derivatives of the predicted class score Y^c with respect to convolutional feature maps A_k:
+    alpha_{k}^{c} = [d²Y^c / d(A_k)²] / [2 · d²Y^c / d(A_k)² + sum(A_k · d³Y^c / d(A_k)³)]
+  - Weights positive gradient contributions (ReLU) to produce a normalized 2D/3D spatial heatmap in range [0, 1].
+  - Overlays the 'jet' colormap heatmap with alpha blending onto the anatomical brain MRI.
+
+• WHY WE USED IT:
+  - Explainable AI (XAI) & Medical Interpretability: Deep neural networks cannot be "black boxes" in healthcare.
+  - Highlights exact anatomical neurodegenerative hotspots (caudate nucleus, putamen, subcortical white matter, and cerebral cortex) that drove the model's classification, allowing clinicians to verify AI findings against established neurological pathology.
+
+
+--------------------------------------------------------------------------------
+6. SHAP (SHAPLEY ADDITIVE EXPLANATIONS — DEEP & KERNEL EXPLAINERS)
+--------------------------------------------------------------------------------
+• WHERE USED:
+  - neurosense/explainability/shap_analysis.py
+  - neurosense/explainability/visualise.py
+
+• HOW IT WORKS:
+  - Based on cooperative game theory: assigns an importance value phi_i to each clinical feature across all possible feature subsets (coalitions).
+  - Calculates marginal contribution: phi_i = sum [ |S|!(|F|-|S|-1)! / |F|! ] · [ f(S U {i}) - f(S) ].
+  - Generates signed feature impact scores and SHAP waterfall/bar attribution charts.
+
+• WHY WE USED IT:
+  - Explains the exact contribution (positive or negative) of each patient biomarker (e.g. how much did CAG=44 push the prediction toward Early HD vs how much did Motor Score=85% pull it toward Pre-manifest).
+  - Ensures transparency, fairness, and trust for healthcare providers and patients.
+
+
+--------------------------------------------------------------------------------
+7. MULTI-TASK PROGRESSION FORECASTING HEAD (JOINT CLASSIFICATION & REGRESSION)
+--------------------------------------------------------------------------------
+• WHERE USED:
+  - neurosense/models/classifier.py
+  - neurosense/models/loss.py
+
+• HOW IT WORKS:
+  - Shared multimodal representation branches into two specialized output heads:
+    1. Staging Classifier Head: Linear(D → 3) with Softmax for categorical probabilities (Pre-manifest, Early HD, Advanced HD).
+    2. Dual-Horizon Progression Regression Head: Linear(D → 2) predicting continuous progression risk / delta index at:
+       - 12-Month horizon (progression_12mo)
+       - 24-Month horizon (progression_24mo)
+  - Joint multi-task loss optimization: L_total = L_classification(CrossEntropy) + lambda1 · L_reg_12mo(Huber/MSE) + lambda2 · L_reg_24mo(Huber/MSE).
+
+• WHY WE USED IT:
+  - Patients and neurologists need more than a snapshot classification; they require forward-looking disease progression trajectory to schedule interventions, clinical trial enrollment, and therapy planning.
+
+
+--------------------------------------------------------------------------------
+8. ADAPTIVE CONFIDENCE-WEIGHTED CLINICAL SCORING & FUSION ENGINE
+--------------------------------------------------------------------------------
+• WHERE USED:
+  - neurosense/api/clinical_scoring.py
+  - neurosense/api/main.py
+
+• HOW IT WORKS:
+  - Integrates empirical neurobiological models with digital assessment scoring:
+    a) Genetic Disease Burden: Langbehn et al. formula -> Burden Score = Age · (CAG - 35.5).
+    b) Motor Impairment Model: Non-linear penalty derived from digital reaction time, finger tapping speed, and coordination.
+    c) Cognitive/Memory Decline Model: Multi-domain decay function based on word recall, sequence span, and visual change detection.
+    d) Functional Independence Scale: Shoulson-Fahn translation to daily living capacity (0–100%).
+  - Dynamically computes probability distribution across stages and fuses image model probabilities with clinical certainty weights.
+
+• WHY WE USED IT:
+  - Allows robust prediction when users only have digital tests (no MRI), when users have MRI without genetic testing, or when both modalities are combined.
+  - Ensures backwards-compatibility with legacy clinical scales (UHDRS Motor, Cognitive, TFC) while enabling digital at-home self-assessment.
+
+
+--------------------------------------------------------------------------------
+9. DIGITAL MOTOR & COGNITIVE ASSESSMENT ALGORITHMS (AT-HOME TESTING SUITE)
+--------------------------------------------------------------------------------
+• WHERE USED:
+  - neurosense/frontend/src/App.jsx
+
+• ALGORITHMS IMPLEMENTED:
+  1. 5-Round Progressive Sequence Memory (Visuospatial Working Memory):
+     - Dynamically generates random spatial permutations avoiding identical adjacent repeats.
+     - Scales difficulty across 5 rounds: Length 3 (750ms) -> 4 (650ms) -> 5 (550ms) -> 6 (460ms) -> 7 (380ms).
+     - Measures Corsi-block spatial span and working memory capacity.
+
+  2. Word Recall with Mathematical Distraction (Verbal Episodic Memory):
+     - Displays pseudo-randomized phonetically distinct semantic word lists with fixed study time (15s).
+     - Implements a 15-second active arithmetic distraction task to clear short-term phonological echoic buffer.
+     - Evaluates long-term verbal episodic recall with Levenshtein fuzzy string normalization.
+
+  3. Visual Change Detection (Visual Short-Term Memory Binding):
+     - Displays an N-element geometric matrix (shapes, colors, spatial positions).
+     - Inserts a 1000ms blank mask (visual flicker paradigm) followed by perturbed probe grid.
+     - Calculates feature-binding retention accuracy under spatial transformation.
+
+  4. Reaction Time & Bradykinesia Latency (Simple Motor Speed):
+     - Random delay timer (1.5s–4.0s) to eliminate anticipation artifacts.
+     - High-precision performance.now() millisecond timestamp delta measurement.
+
+  5. Finger Tapping Frequency (Motor Speed & Bradykinesia):
+     - 10-second continuous tap counter evaluating tapping frequency (Hz), fatigue slope, and rhythm stability.
+
+  6. Target Tracking & Hand-Eye Coordination (Chorea & Dysmetria):
+     - 2D trajectory path generation with continuous Euclidean distance deviation tracking:
+       Distance = sqrt((x_target - x_cursor)² + (y_target - y_cursor)²).
+
+• WHY WE USED IT:
+  - Replaces inaccessible, expensive clinical UHDRS assessments with scientifically validated, gamified digital biomarkers accessible from any smartphone, tablet, or laptop.
+
+
+--------------------------------------------------------------------------------
+10. OPTIMIZATION & TRAINING ALGORITHMS
+--------------------------------------------------------------------------------
+• WHERE USED:
+  - neurosense/training/trainer.py
+  - neurosense/training/evaluate.py
+
+• HOW IT WORKS:
+  - AdamW Optimizer: Decoupled weight decay regularization to avoid gradient scaling distortions.
+  - Cosine Annealing with Warm Restarts Learning Rate Scheduler:
+    eta_t = eta_min + 0.5 · (eta_max - eta_min) · (1 + cos(pi · T_cur / T_i)).
+  - Mixed Precision Training (torch.cuda.amp.autocast): Accelerates 3D volumetric tensor computations with FP16/BF16 while maintaining FP32 master weights.
+  - Data Augmentation for 3D MRI: Random 3D affine rotations (+-15 deg), random scaling (0.9–1.1), Gaussian noise injection, and intensity windowing.
+
+• WHY WE USED IT:
+  - Enables stable convergence when training deep 3D volumetric neural networks on GPU/MPS hardware without gradient explosion or memory exhaustion.
+================================================================================

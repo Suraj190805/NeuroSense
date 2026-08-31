@@ -1,0 +1,15 @@
+• FrontEnd : React.js, Custom CSS (Vanilla CSS Design System), Three.js, Recharts, Framer Motion, Vite
+
+• Backend : FastAPI (Python), Uvicorn (ASGI Server), Pydantic v2, RESTful API Design
+
+• Database : MongoDB Atlas (Cloud NoSQL), Motor (Async Python Driver), PyMongo
+
+• DL Frameworks : PyTorch (torch, torchvision), MONAI (Medical Open Network for AI)
+
+• Explainability (XAI) : GradCAM++ (pytorch-grad-cam), SHAP (SHapley Additive exPlanations)
+
+• Libraries & Data Processing : NumPy, Pandas, SciPy, Pillow (PIL), Scikit-Learn
+
+• Neuroimaging I/O : NiBabel (3D NIfTI .nii / .nii.gz file processing)
+
+• Visualization : Matplotlib, Three.js (3D Interactive Brain Rendering), HTML5 Canvas

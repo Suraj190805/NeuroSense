@@ -14,10 +14,10 @@ WORKFLOW:
   3. Run this script to process, resize, and organize them:
      python -m neurosense.scripts.build_hd_dataset
 
-  4. Retrain the model:
-     python -m neurosense.training.train_parkinsons \\
-         --data-root data/hd_training/dataset \\
-         --epochs 30 --batch-size 8
+  4. Retrain the model on HD dataset:
+     python -m neurosense.training.train \
+         --data-root data/hd_training/dataset \
+         --epochs 30
 
 The script will:
   - Resize all images to 256×256
@@ -68,34 +68,24 @@ def process_image(
     img: Image.Image,
     target_size: int = 256,
 ) -> Image.Image:
-    """Process a raw image for training.
+    """Process and harmonize a raw image for training.
 
-    Converts to RGB, resizes to square, and normalizes.
+    Applies cranial isolation, CLAHE contrast enhancement, and
+    brain foreground Z-score normalization to prevent shortcut learning.
 
     Args:
         img: Raw input image.
         target_size: Target dimension (square).
 
     Returns:
-        Processed image.
+        Harmonized RGB PIL Image.
     """
-    # Convert to RGB
-    img = img.convert("RGB")
+    from neurosense.data.harmonizer import harmonize_2d_slice
 
-    # Resize to square (maintain aspect ratio, pad if needed)
-    w, h = img.size
-    max_dim = max(w, h)
-    
-    # Create square canvas with black background
-    square = Image.new("RGB", (max_dim, max_dim), (0, 0, 0))
-    offset_x = (max_dim - w) // 2
-    offset_y = (max_dim - h) // 2
-    square.paste(img, (offset_x, offset_y))
-
-    # Resize to target
-    square = square.resize((target_size, target_size), Image.LANCZOS)
-
-    return square
+    harmonized_2d, _ = harmonize_2d_slice(img, target_size=target_size)
+    # Convert float32 [0, 1] to uint8 [0, 255] RGB PIL Image
+    img_uint8 = (harmonized_2d * 255.0).clip(0, 255).astype(np.uint8)
+    return Image.fromarray(img_uint8).convert("RGB")
 
 
 def augment_for_training(
@@ -183,11 +173,10 @@ def build_dataset(
     raw_normal_dir = Path(raw_normal_dir)
     output_dir = Path(output_dir)
 
-    # Create output directories using the class names expected
-    # by the existing ParkinsonsDataset loader
-    # We map: "normal" → class 0, "parkinson" → class 1 (HD)
+    # Create output directories for classes
+    # We map: "normal" → class 0, "huntington" → class 1 (HD)
     normal_out = output_dir / "normal"
-    hd_out = output_dir / "parkinson"  # Reuse class name for compatibility
+    hd_out = output_dir / "huntington"
 
     normal_out.mkdir(parents=True, exist_ok=True)
     hd_out.mkdir(parents=True, exist_ok=True)
@@ -369,11 +358,10 @@ def main() -> None:
     print(f"  Augmented HD:       {stats['aug_hd']}")
     print(f"  Augmented normal:   {stats['aug_normal']}")
     print(f"  Output:             {args.output_dir}")
-    print()
     print(f"  To retrain the model:")
-    print(f"    python -m neurosense.training.train_parkinsons \\")
+    print(f"    python -m neurosense.training.train \\")
     print(f"      --data-root {args.output_dir} \\")
-    print(f"      --epochs 30 --batch-size 8")
+    print(f"      --epochs 30")
     print(f"{'='*60}")
 
 

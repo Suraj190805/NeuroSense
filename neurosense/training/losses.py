@@ -63,7 +63,7 @@ class WeightedCrossEntropyLoss(nn.Module):
     def __init__(
         self,
         class_weights: torch.Tensor | None = None,
-        label_smoothing: float = 0.05,
+        label_smoothing: float = 0.1,
         num_classes: int = 3,
     ) -> None:
         super().__init__()

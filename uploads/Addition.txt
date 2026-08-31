@@ -1,0 +1,14 @@
+Allow the chatbot to answer questions based on a patient’s historical reports.
+deploy backend on RAILWAY / RENDER
+make login for both the user and doctor and make sure to connect the doctor and the patient with a code or link , when the user or doc enters a code the details of the user / docs comes up and they can connect with each other 
+and also when the docter connects with the user , he should be able to track the user 
+
+addition:
+implement heat map 
+make the CAG seq optional 
+
+
+
+
+edited  :
+removed the uhdrs scores and implemented the memory and motor test scores 

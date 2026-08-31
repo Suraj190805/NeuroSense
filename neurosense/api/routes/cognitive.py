@@ -19,6 +19,7 @@ Endpoints:
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -27,6 +28,12 @@ from pydantic import BaseModel, Field
 from neurosense.cognitive.scoring import ClinicalCategory
 from neurosense.cognitive.session import session_manager
 from neurosense.cognitive.tests import TEST_ORDER, TestName
+from neurosense.database.connection import ensure_connected, is_connected
+from neurosense.database.crud import (
+    get_sessions_by_patient,
+    save_cognitive_session,
+)
+from neurosense.database.models import CognitiveSessionDocument
 
 logger = logging.getLogger(__name__)
 
@@ -278,10 +285,21 @@ async def get_patient_history(
     try:
         sessions = session_manager.get_patient_history(patient_id)
 
+        # Also fetch from MongoDB if connected
+        db_sessions: list[dict[str, Any]] = []
+        if is_connected():
+            try:
+                db_sessions = await get_sessions_by_patient(patient_id)
+            except Exception as e:
+                logger.warning("Failed to fetch DB history: %s", e)
+
+        # Merge: use DB sessions if we have them, fall back to in-memory
+        all_sessions = db_sessions if db_sessions else sessions
+
         return PatientHistoryResponse(
             patient_id=patient_id,
-            total_sessions=len(sessions),
-            sessions=sessions,
+            total_sessions=len(all_sessions),
+            sessions=all_sessions,
         )
 
     except Exception as e:
@@ -351,3 +369,37 @@ async def complete_session(
     except Exception as e:
         logger.error("Failed to complete session: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+    finally:
+        # Persist completed session to MongoDB (best-effort)
+        if not is_connected():
+            await ensure_connected()
+
+        if is_connected():
+            try:
+                cat_val = (
+                    summary.overall_category.value
+                    if hasattr(summary.overall_category, "value")
+                    else str(summary.overall_category)
+                )
+                session_doc = CognitiveSessionDocument(
+                    session_id=summary.session_id,
+                    patient_id=summary.patient_id,
+                    patient_age=getattr(summary, "patient_age", 0.0),
+                    status="completed" if summary.is_valid else "invalid",
+                    session_number=summary.session_number,
+                    is_baseline=summary.is_baseline,
+                    is_valid=summary.is_valid,
+                    versions_used=versions,
+                    domain_scores=domains,
+                    overall_category=cat_val,
+                    feature_vector=summary.feature_vector,
+                    validation_flags=summary.validation_flags,
+                    completed_at=datetime.now(timezone.utc),
+                )
+                await save_cognitive_session(session_doc)
+                logger.info("Saved cognitive session to MongoDB: %s", summary.session_id)
+            except Exception as db_err:
+                logger.warning(
+                    "Failed to persist cognitive session to DB: %s", db_err, exc_info=True
+                )

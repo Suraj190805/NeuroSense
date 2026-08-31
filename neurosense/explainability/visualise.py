@@ -501,8 +501,8 @@ def create_report_figure(
 
         summary_lines.extend([
             ("", "", TEXT_COLOR),
-            ("12-Month Δ UHDRS:", f"  {p12:+.1f}", TEXT_COLOR),
-            ("24-Month Δ UHDRS:", f"  {p24:+.1f}", TEXT_COLOR),
+            ("12-Month Progression Δ:", f"  {p12:+.1f}", TEXT_COLOR),
+            ("24-Month Progression Δ:", f"  {p24:+.1f}", TEXT_COLOR),
             ("Risk Category:", f"  {risk.upper()}", _risk_color(risk)),
         ])
 
@@ -698,3 +698,58 @@ def _risk_color(risk: str) -> str:
         "high": "#F44336",
     }
     return risk_colors.get(risk.lower(), TEXT_COLOR)
+
+
+def save_2d_heatmap_overlay(
+    image: Any,
+    heatmap: np.ndarray,
+    output_path: str | Path,
+    alpha: float = 0.45,
+    colormap: str = "jet",
+    title: str = "GradCAM++ Brain Heatmap",
+    dpi: int = 150,
+) -> Path:
+    """Save a 2D MRI slice with GradCAM++ heatmap overlay to a file.
+
+    Args:
+        image: PIL Image or 2D numpy array [H, W].
+        heatmap: 2D heatmap numpy array [H, W] normalized to [0, 1].
+        output_path: Destination image path.
+        alpha: Overlay blending transparency.
+        colormap: Matplotlib colormap name.
+        title: Image title.
+        dpi: Resolution.
+
+    Returns:
+        Path to saved PNG.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    fig, ax = plt.subplots(figsize=(6, 6), facecolor=BACKGROUND_COLOR)
+    ax.imshow(image, cmap=MRI_COLORMAP)
+
+    heat_masked = np.ma.masked_where(heatmap < 0.05, heatmap)
+    ax.imshow(
+        heat_masked,
+        cmap=colormap,
+        alpha=alpha,
+        vmin=0.0,
+        vmax=1.0,
+        aspect="equal",
+    )
+    ax.set_title(title, color=TEXT_COLOR, fontsize=12, fontweight="bold", pad=12)
+    ax.axis("off")
+    ax.set_facecolor(BACKGROUND_COLOR)
+
+    fig.savefig(
+        output_path,
+        dpi=dpi,
+        bbox_inches="tight",
+        facecolor=BACKGROUND_COLOR,
+        edgecolor="none",
+    )
+    plt.close(fig)
+    logger.info("2D Heatmap overlay saved to %s", output_path)
+    return output_path
+

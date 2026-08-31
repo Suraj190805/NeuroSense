@@ -1,23 +1,19 @@
-"""Clinical HD Scoring Engine.
+"""Clinical & Digital HD Assessment Engine.
 
-Computes Huntington's Disease staging from clinical biomarkers
-using established neurological criteria. This provides a robust
-clinical signal that can be fused with image model predictions.
+Computes Huntington's Disease staging, progression, and explainability
+from digital assessment biomarkers (Motor Test score, Memory/Cognitive score,
+Daily Functional capacity, CAG repeat, Age, and optional clinical symptoms).
+
+Provides a robust clinical/digital assessment signal that is fused with
+brain MRI neuroimaging model predictions.
 
 Criteria used:
-    - Shoulson-Fahn TFC staging (TFC 11-13 = Stage I, etc.)
-    - CAG repeat penetrance levels
-    - UHDRS Total Motor Score severity bands
+    - Digital Motor Assessment performance (reaction speed, finger tapping, coordination)
+    - Digital Memory & Cognitive performance (episodic recall, working memory, pattern change)
+    - Functional independence level (activities of daily living)
+    - CAG repeat genetic penetrance (36–120)
     - Langbehn age-adjusted onset estimation
-    - Cognitive assessment decline mapping
-
-References:
-    - Shoulson I, Fahn S (1979). Huntington disease: clinical care
-      and evaluation. Neurology.
-    - Langbehn DR et al. (2004). A new model for prediction of the
-      age of onset and penetrance for HD. Clinical Genetics.
-    - Ross CA et al. (2014). Huntington disease: natural history,
-      biomarkers and prospects for therapeutics. Nature Reviews.
+    - Clinical symptoms (movement, cognitive, psychiatric) — optional
 """
 
 from __future__ import annotations
@@ -28,10 +24,57 @@ from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
+# ═════════════════════════════════════════════════════════════════
+#  HD Symptom Categories (Mayo Clinic & NIH clinical criteria)
+# ═════════════════════════════════════════════════════════════════
+
+SYMPTOM_CATEGORIES: dict[str, dict] = {
+    "movement": {
+        "weight": 0.40,
+        "symptoms": [
+            "chorea",
+            "dystonia",
+            "bradykinesia",
+            "impaired_gait",
+            "difficulty_swallowing",
+            "slurred_speech",
+            "abnormal_eye_movements",
+        ],
+    },
+    "cognitive": {
+        "weight": 0.35,
+        "symptoms": [
+            "difficulty_organizing",
+            "slow_processing",
+            "difficulty_learning",
+            "perseveration",
+            "lack_of_awareness",
+            "poor_impulse_control",
+        ],
+    },
+    "psychiatric": {
+        "weight": 0.25,
+        "symptoms": [
+            "depression",
+            "irritability",
+            "apathy",
+            "anxiety",
+            "social_withdrawal",
+            "insomnia",
+            "weight_loss_fatigue",
+        ],
+    },
+}
+
+# Flat set for fast lookup
+_ALL_SYMPTOM_IDS: set[str] = {
+    s for cat in SYMPTOM_CATEGORIES.values() for s in cat["symptoms"]
+}
+
 
 @dataclass
 class ClinicalScore:
-    """Result of clinical HD scoring.
+    """Result of clinical/digital HD scoring.
 
     Attributes:
         stage: Predicted HD stage (pre_manifest / early / advanced).
@@ -40,12 +83,12 @@ class ClinicalScore:
         early_prob: Probability of early HD stage.
         advanced_prob: Probability of advanced HD stage.
         risk_category: Risk level (low / medium / high).
-        progression_12mo: Expected 12-month UHDRS-TMS change.
-        progression_24mo: Expected 24-month UHDRS-TMS change.
+        progression_12mo: Expected 12-month progression score change.
+        progression_24mo: Expected 24-month progression score change.
         feature_impacts: Dict of feature name → impact score.
-        clinical_certainty: How strongly clinical data indicates
+        clinical_certainty: How strongly biomarkers indicate
             a definitive staging (0.0–1.0). Used to weight
-            clinical vs image model in fusion.
+            digital/clinical vs image model in fusion.
     """
 
     stage: str
@@ -62,63 +105,105 @@ class ClinicalScore:
 
 def compute_clinical_score(
     cag_repeat: float,
-    uhdrs_motor: float,
-    uhdrs_cognitive: float,
-    tfc_score: float,
-    age: float,
+    motor_score: float | None = None,
+    memory_score: float | None = None,
+    functional_score: float | None = None,
+    age: float = 45.0,
+    # Backward compatibility with legacy parameter names:
+    uhdrs_motor: float | None = None,
+    uhdrs_cognitive: float | None = None,
+    tfc_score: float | None = None,
+    # Optional clinical symptoms:
+    symptoms: list[str] | None = None,
 ) -> ClinicalScore:
-    """Compute HD staging from clinical biomarkers.
-
-    Uses a multi-factor scoring system based on established
-    neurological criteria to determine HD stage, confidence,
-    and progression forecast.
+    """Compute HD staging from digital motor/memory tests & biomarkers.
 
     Args:
         cag_repeat: CAG trinucleotide repeat count (36–120).
-        uhdrs_motor: UHDRS Total Motor Score (0–124).
-        uhdrs_cognitive: UHDRS Cognitive Assessment score.
-        tfc_score: Total Functional Capacity (0–13).
+        motor_score: Digital motor assessment score (0–100%).
+        memory_score: Digital memory/cognitive assessment score (0–100%).
+        functional_score: Daily functional independence (0–100%).
         age: Patient age in years (18–90).
+        uhdrs_motor: (Legacy) UHDRS Total Motor Score (0–124).
+        uhdrs_cognitive: (Legacy) UHDRS Cognitive score.
+        tfc_score: (Legacy) Total Functional Capacity (0–13).
+        symptoms: Optional list of symptom IDs the patient reports.
 
     Returns:
         ClinicalScore with staging, probabilities, and forecasts.
     """
-    # ─── 1. Shoulson-Fahn TFC Staging ───
-    # This is the gold standard for HD staging
-    tfc_stage = _tfc_to_shoulson_fahn(tfc_score)
+    # ─── 0. Normalize inputs & legacy parameters ───
+    if motor_score is None:
+        if uhdrs_motor is not None:
+            motor_score = max(0.0, min(100.0, 100.0 - (uhdrs_motor / 124.0 * 100.0)))
+        else:
+            motor_score = 85.0
+
+    if memory_score is None:
+        if uhdrs_cognitive is not None:
+            memory_score = max(0.0, min(100.0, (uhdrs_cognitive / 200.0) * 100.0))
+        else:
+            memory_score = 85.0
+
+    if functional_score is None:
+        if tfc_score is not None:
+            functional_score = max(0.0, min(100.0, (tfc_score / 13.0) * 100.0))
+        else:
+            functional_score = 100.0
+
+    # ─── 1. Functional Independence Staging ───
+    func_result = _functional_severity(functional_score)
 
     # ─── 2. CAG Repeat Analysis ───
     cag_score = _cag_severity(cag_repeat)
 
-    # ─── 3. UHDRS Motor Severity ───
-    motor_score = _motor_severity(uhdrs_motor)
+    # ─── 3. Motor Test Performance Severity ───
+    motor_result = _motor_severity(motor_score)
 
-    # ─── 4. Cognitive Assessment ───
-    cognitive_score = _cognitive_severity(uhdrs_cognitive)
+    # ─── 4. Memory / Cognitive Assessment ───
+    memory_result = _cognitive_severity(memory_score)
 
     # ─── 5. Age-CAG Onset Estimation (Langbehn formula) ───
     years_to_onset = _langbehn_onset(cag_repeat, age)
 
+    # ─── 5b. Symptom Severity (optional) ───
+    symptom_result = _symptom_severity(symptoms)
+    has_symptoms = symptom_result["severity"] > 0.0
+
     # ─── 6. Composite Scoring ───
-    # Weight the different indicators
-    # TFC is the most clinically validated staging tool
-    # CAG and motor are strong secondary indicators
-    weights = {
-        "tfc": 0.30,
-        "cag": 0.25,
-        "motor": 0.25,
-        "cognitive": 0.10,
-        "onset": 0.10,
-    }
+    # Weights for self-administered assessment model:
+    # Motor test & CAG are major primary indicators of manifest status,
+    # Memory test & Functional capacity provide strong cognitive/ADL validation.
+    # When symptoms are provided, they contribute ~25% and other weights
+    # are proportionally reduced to make room.
+    if has_symptoms:
+        weights = {
+            "motor": 0.22,
+            "cag": 0.20,
+            "functional": 0.15,
+            "memory": 0.10,
+            "onset": 0.08,
+            "symptoms": 0.25,
+        }
+    else:
+        weights = {
+            "motor": 0.30,
+            "cag": 0.25,
+            "functional": 0.20,
+            "memory": 0.15,
+            "onset": 0.10,
+        }
 
     # Each component produces a severity score (0=normal, 1=severe)
     components = {
-        "tfc": tfc_stage["severity"],
+        "motor": motor_result["severity"],
         "cag": cag_score["severity"],
-        "motor": motor_score["severity"],
-        "cognitive": cognitive_score["severity"],
+        "functional": func_result["severity"],
+        "memory": memory_result["severity"],
         "onset": _onset_severity(years_to_onset),
     }
+    if has_symptoms:
+        components["symptoms"] = symptom_result["severity"]
 
     # Weighted composite
     composite = sum(
@@ -148,26 +233,24 @@ def compute_clinical_score(
     early_prob /= total
     advanced_prob /= total
 
-    # Confidence is the max probability
     confidence = max(pre_prob, early_prob, advanced_prob)
 
-    # ─── 8. Clinical Certainty ───
-    # How strongly do clinical indicators agree on the staging?
-    # High certainty when multiple indicators point to the same stage
+    # ─── 8. Assessment Certainty ───
     agreement = _compute_agreement(components)
     clinical_certainty = min(1.0, agreement * 0.8 + composite * 0.2)
 
     # Boost certainty for extreme values
-    if cag_repeat >= 50 and uhdrs_motor >= 60:
-        clinical_certainty = max(clinical_certainty, 0.90)
-    elif cag_repeat >= 45 and uhdrs_motor >= 40:
-        clinical_certainty = max(clinical_certainty, 0.75)
-    elif cag_repeat <= 39 and uhdrs_motor <= 10:
-        clinical_certainty = max(clinical_certainty, 0.70)
+    if cag_repeat is not None:
+        if cag_repeat >= 50 and motor_score <= 40:
+            clinical_certainty = max(clinical_certainty, 0.90)
+        elif cag_repeat >= 45 and motor_score <= 60:
+            clinical_certainty = max(clinical_certainty, 0.75)
+        elif cag_repeat <= 39 and motor_score >= 85:
+            clinical_certainty = max(clinical_certainty, 0.70)
 
     # ─── 9. Progression Forecast ───
     prog_12, prog_24 = _estimate_progression(
-        cag_repeat, uhdrs_motor, tfc_score, age, composite,
+        cag_repeat, motor_score, functional_score, age, composite,
     )
 
     # ─── 10. Risk Category ───
@@ -178,12 +261,11 @@ def compute_clinical_score(
     else:
         risk = "high"
 
-    # ─── 11. Feature Impacts ───
-    # SHAP-like attribution: how much each feature
-    # contributed to the disease severity score
+    # ─── 11. Feature Impacts (SHAP-like) ───
     feature_impacts = _compute_feature_impacts(
-        cag_repeat, uhdrs_motor, uhdrs_cognitive,
-        tfc_score, age, components, weights,
+        cag_repeat, motor_score, memory_score,
+        functional_score, age, components, weights,
+        symptoms=symptoms,
     )
 
     return ClinicalScore(
@@ -205,45 +287,27 @@ def compute_clinical_score(
 # ═════════════════════════════════════════════════════════════════
 
 
-def _tfc_to_shoulson_fahn(tfc: float) -> dict:
-    """Map TFC score to Shoulson-Fahn HD staging.
+def _functional_severity(functional_score: float) -> dict:
+    """Map Daily Functional Independence score (0–100%) to severity.
 
-    Standard clinical staging:
-        Stage I:   TFC 11–13 (early, independent)
-        Stage II:  TFC 7–10 (reduced capacity)
-        Stage III: TFC 3–6  (dependent)
-        Stage IV:  TFC 1–2  (severe dependency)
-        Stage V:   TFC 0    (total care)
-
-    Returns:
-        Dict with stage name and severity (0–1).
+    100% = fully independent (Stage I equivalent)
+    0% = severe dependency (Stage V equivalent)
     """
-    if tfc >= 11:
+    if functional_score >= 85:
         return {"stage": "I", "severity": 0.10}
-    elif tfc >= 7:
+    elif functional_score >= 60:
         return {"stage": "II", "severity": 0.35}
-    elif tfc >= 3:
+    elif functional_score >= 35:
         return {"stage": "III", "severity": 0.65}
-    elif tfc >= 1:
+    elif functional_score >= 15:
         return {"stage": "IV", "severity": 0.85}
     else:
         return {"stage": "V", "severity": 1.0}
 
 
-def _cag_severity(cag: float) -> dict:
-    """Score CAG repeat severity.
-
-    Clinical significance:
-        36–39: Reduced penetrance (may or may not develop HD)
-        40–44: Full penetrance, typical adult onset
-        45–49: Full penetrance, earlier onset likely
-        50–59: High repeat, earlier onset + faster progression
-        60+:   Juvenile HD range
-
-    Returns:
-        Dict with description and severity (0–1).
-    """
-    if cag < 36:
+def _cag_severity(cag: float | None) -> dict:
+    """Score CAG repeat severity."""
+    if cag is None or cag < 36:
         return {"desc": "normal", "severity": 0.0}
     elif cag <= 39:
         return {"desc": "reduced_penetrance", "severity": 0.15}
@@ -257,98 +321,60 @@ def _cag_severity(cag: float) -> dict:
         return {"desc": "juvenile_range", "severity": 0.95}
 
 
-def _motor_severity(motor: float) -> dict:
-    """Score UHDRS Total Motor Score severity.
+def _motor_severity(motor_score: float) -> dict:
+    """Score Digital Motor Assessment severity.
 
-    Clinical bands:
-        0–5:    Normal / minimal signs
-        6–15:   Soft signs (possible pre-manifest)
-        16–30:  Mild motor impairment (early HD)
-        31–60:  Moderate motor impairment
-        61–90:  Severe motor impairment
-        91–124: Very severe / end-stage motor
-
-    Returns:
-        Dict with description and severity (0–1).
+    100% = normal / high-performance reaction, tapping, coordination.
+    < 30% = severe motor slowing, choreic instability, tremors.
     """
-    if motor <= 5:
+    if motor_score >= 85:
         return {"desc": "normal", "severity": 0.05}
-    elif motor <= 15:
+    elif motor_score >= 70:
         return {"desc": "soft_signs", "severity": 0.20}
-    elif motor <= 30:
-        return {"desc": "mild", "severity": 0.40}
-    elif motor <= 60:
-        return {"desc": "moderate", "severity": 0.60}
-    elif motor <= 90:
-        return {"desc": "severe", "severity": 0.80}
+    elif motor_score >= 50:
+        return {"desc": "mild_impairment", "severity": 0.40}
+    elif motor_score >= 35:
+        return {"desc": "moderate_impairment", "severity": 0.60}
+    elif motor_score >= 20:
+        return {"desc": "severe_impairment", "severity": 0.80}
     else:
         return {"desc": "very_severe", "severity": 0.95}
 
 
-def _cognitive_severity(cognitive: float) -> dict:
-    """Score UHDRS cognitive assessment severity.
+def _cognitive_severity(memory_score: float) -> dict:
+    """Score Digital Memory & Cognitive test severity.
 
-    Higher scores indicate better cognitive function.
-    Normal composite typically 180–250+.
-    HD patients show progressive decline.
-
-    Returns:
-        Dict with description and severity (0–1).
+    100% = normal / strong episodic & working memory.
+    < 35% = severe memory decline.
     """
-    if cognitive >= 200:
+    if memory_score >= 85:
         return {"desc": "normal", "severity": 0.05}
-    elif cognitive >= 160:
+    elif memory_score >= 70:
         return {"desc": "mild_decline", "severity": 0.25}
-    elif cognitive >= 120:
+    elif memory_score >= 50:
         return {"desc": "moderate_decline", "severity": 0.50}
-    elif cognitive >= 80:
+    elif memory_score >= 35:
         return {"desc": "significant_decline", "severity": 0.75}
     else:
         return {"desc": "severe_decline", "severity": 0.90}
 
 
-def _langbehn_onset(cag: float, age: float) -> float:
-    """Estimate years to HD motor onset using Langbehn formula.
+def _langbehn_onset(cag: float | None, age: float) -> float:
+    """Estimate years to HD motor onset using Langbehn formula."""
+    if cag is None or cag < 36:
+        return 50.0
 
-    Based on Langbehn et al. (2004) parametric survival model.
-    Estimates the expected age of motor onset for a given CAG
-    repeat length, then computes years remaining.
-
-    A simplified version of the published model:
-        median_onset_age ≈ 21.54 + exp(9.556 - 0.146 * CAG)
-
-    Args:
-        cag: CAG repeat count.
-        age: Current age.
-
-    Returns:
-        Estimated years to onset. Negative = past expected onset.
-    """
-    if cag < 36:
-        return 50.0  # Not a carrier
-
-    # Simplified Langbehn onset prediction
     try:
         median_onset = 21.54 + math.exp(9.556 - 0.146 * cag)
     except OverflowError:
-        median_onset = 100.0  # Very low CAG
+        median_onset = 100.0
 
-    # Clamp to reasonable range
     median_onset = max(15.0, min(90.0, median_onset))
-
     return median_onset - age
 
 
 def _onset_severity(years_to_onset: float) -> float:
-    """Convert years-to-onset to severity score.
-
-    Args:
-        years_to_onset: Estimated years to motor onset.
-            Negative = past expected onset.
-
-    Returns:
-        Severity score (0–1). Higher = more severe.
-    """
+    """Convert years-to-onset to severity score."""
     if years_to_onset > 15:
         return 0.05
     elif years_to_onset > 5:
@@ -363,159 +389,171 @@ def _onset_severity(years_to_onset: float) -> float:
         return 0.95
 
 
-def _compute_agreement(components: dict[str, float]) -> float:
-    """Compute agreement between component scores.
+def _symptom_severity(symptoms: list[str] | None) -> dict:
+    """Score patient-reported clinical symptoms.
 
-    High agreement = all components suggest similar severity
-    = high clinical certainty.
+    Maps a list of symptom IDs to a severity score (0.0–1.0)
+    based on per-category clinical weights.
 
-    Args:
-        components: Dict of component name → severity (0–1).
-
-    Returns:
-        Agreement score (0–1). 1.0 = perfect agreement.
+    Sources:
+        - Mayo Clinic: https://www.mayoclinic.org/diseases-conditions/
+          huntingtons-disease/symptoms-causes/syc-20356117
+        - NIH/NINDS: https://www.ninds.nih.gov/health-information/
+          disorders/huntingtons-disease
     """
+    if not symptoms:
+        return {"desc": "none_reported", "severity": 0.0, "count": 0}
+
+    # Filter to known symptom IDs
+    valid = [s for s in symptoms if s in _ALL_SYMPTOM_IDS]
+    if not valid:
+        return {"desc": "none_recognised", "severity": 0.0, "count": 0}
+
+    valid_set = set(valid)
+    category_scores = []
+
+    for cat_name, cat_info in SYMPTOM_CATEGORIES.items():
+        cat_symptoms = cat_info["symptoms"]
+        cat_weight = cat_info["weight"]
+        matched = sum(1 for s in cat_symptoms if s in valid_set)
+        if matched > 0:
+            # Ratio of symptoms in this category (0–1)
+            ratio = matched / len(cat_symptoms)
+            category_scores.append(ratio * cat_weight)
+
+    if not category_scores:
+        return {"desc": "none_matched", "severity": 0.0, "count": 0}
+
+    # Raw severity is the sum of weighted category ratios, capped at 1.0
+    raw_severity = min(1.0, sum(category_scores) / sum(
+        c["weight"] for c in SYMPTOM_CATEGORIES.values()
+    ))
+
+    # Apply a mild scaling boost for multi-category spread
+    categories_hit = sum(
+        1 for cat_info in SYMPTOM_CATEGORIES.values()
+        if any(s in valid_set for s in cat_info["symptoms"])
+    )
+    spread_bonus = 0.05 * (categories_hit - 1) if categories_hit > 1 else 0.0
+    severity = min(1.0, raw_severity + spread_bonus)
+
+    total = len(valid)
+    if severity >= 0.7:
+        desc = "severe_symptom_burden"
+    elif severity >= 0.4:
+        desc = "moderate_symptom_burden"
+    elif severity >= 0.15:
+        desc = "mild_symptom_burden"
+    else:
+        desc = "minimal_symptoms"
+
+    logger.info(
+        "Symptom severity: %d symptoms across %d categories → %.2f (%s)",
+        total, categories_hit, severity, desc,
+    )
+
+    return {"desc": desc, "severity": round(severity, 4), "count": total}
+
+
+def _compute_agreement(components: dict[str, float]) -> float:
+    """Compute agreement between component scores."""
     values = list(components.values())
     if not values:
         return 0.5
 
     mean = sum(values) / len(values)
     variance = sum((v - mean) ** 2 for v in values) / len(values)
-
-    # Low variance = high agreement
-    # Scale: variance of 0 → agreement of 1.0
-    #         variance of 0.1 → agreement of ~0.5
     agreement = math.exp(-variance * 10)
     return agreement
 
 
 def _estimate_progression(
-    cag: float,
-    motor: float,
-    tfc: float,
+    cag: float | None,
+    motor_score: float,
+    functional_score: float,
     age: float,
     composite: float,
 ) -> tuple[float, float]:
-    """Estimate UHDRS-TMS progression at 12 and 24 months.
-
-    Based on published HD natural history data:
-    - Pre-manifest: 1–3 points/year TMS increase
-    - Early HD: 4–8 points/year
-    - Advanced: 5–12 points/year (can plateau in late stages)
-
-    CAG repeat influences progression rate (higher = faster).
-
-    Args:
-        cag: CAG repeat count.
-        motor: Current UHDRS-TMS.
-        tfc: Current TFC score.
-        age: Patient age.
-        composite: Composite severity score.
-
-    Returns:
-        Tuple of (12-month change, 24-month change).
-    """
-    # Base progression rate from composite severity
+    """Estimate progression rate at 12 and 24 months."""
     if composite < 0.2:
-        base_rate = 1.5   # Pre-manifest: slow
+        base_rate = 1.5
     elif composite < 0.4:
-        base_rate = 4.0   # Early: moderate
+        base_rate = 4.0
     elif composite < 0.6:
-        base_rate = 6.5   # Mid-stage: faster
+        base_rate = 6.5
     elif composite < 0.8:
-        base_rate = 8.0   # Advanced: significant
+        base_rate = 8.0
     else:
-        base_rate = 5.0   # Late stage: may plateau
+        base_rate = 5.0
 
-    # CAG modifier: higher CAG = faster progression
     cag_modifier = 1.0
-    if cag >= 50:
-        cag_modifier = 1.4
-    elif cag >= 45:
-        cag_modifier = 1.2
-    elif cag >= 42:
-        cag_modifier = 1.1
+    if cag is not None:
+        if cag >= 50:
+            cag_modifier = 1.4
+        elif cag >= 45:
+            cag_modifier = 1.2
+        elif cag >= 42:
+            cag_modifier = 1.1
 
-    # Age modifier: older patients may progress faster
     age_modifier = 1.0
     if age >= 60:
         age_modifier = 1.15
     elif age >= 50:
         age_modifier = 1.05
 
-    # Ceiling effect: if already high TMS, less room to worsen
-    if motor >= 100:
+    # If motor score is already very low, plateau factor
+    if motor_score <= 15:
         ceiling_factor = 0.5
-    elif motor >= 80:
+    elif motor_score <= 30:
         ceiling_factor = 0.7
     else:
         ceiling_factor = 1.0
 
     prog_12 = base_rate * cag_modifier * age_modifier * ceiling_factor
-    prog_24 = prog_12 * 1.85  # Slightly less than 2x (some non-linearity)
+    prog_24 = prog_12 * 1.85
 
     return prog_12, prog_24
 
 
 def _compute_feature_impacts(
-    cag: float,
-    motor: float,
-    cognitive: float,
-    tfc: float,
+    cag: float | None,
+    motor_score: float,
+    memory_score: float,
+    functional_score: float,
     age: float,
     components: dict[str, float],
     weights: dict[str, float],
+    symptoms: list[str] | None = None,
 ) -> dict[str, float]:
-    """Compute SHAP-like feature importance scores.
-
-    Shows how much each clinical feature contributed to the
-    overall disease severity assessment. Positive values
-    indicate the feature increased the predicted severity.
-
-    Args:
-        cag: CAG repeat count.
-        motor: UHDRS motor score.
-        cognitive: UHDRS cognitive score.
-        tfc: TFC score.
-        age: Patient age.
-        components: Component severity scores.
-        weights: Component weights.
-
-    Returns:
-        Dict of feature_name → impact score.
-    """
-    # Baseline: average severity that would give a neutral prediction
-    baseline = 0.25  # Below this = pre-manifest
+    """Compute SHAP-like feature importance scores."""
+    baseline = 0.25
 
     impacts = {}
 
-    # CAG impact: how much CAG pushes severity above baseline
     cag_contrib = components["cag"] * weights["cag"]
     impacts["cag_repeat"] = round(cag_contrib - baseline * weights["cag"], 4)
 
-    # Motor impact
     motor_contrib = components["motor"] * weights["motor"]
-    impacts["uhdrs_motor"] = round(
+    impacts["motor_score"] = round(
         motor_contrib - baseline * weights["motor"], 4,
     )
 
-    # Cognitive impact
-    cog_contrib = components["cognitive"] * weights["cognitive"]
-    impacts["uhdrs_cognitive"] = round(
-        cog_contrib - baseline * weights["cognitive"], 4,
+    mem_contrib = components["memory"] * weights["memory"]
+    impacts["memory_score"] = round(
+        mem_contrib - baseline * weights["memory"], 4,
     )
 
-    # TFC impact (inverted: low TFC = high severity)
-    tfc_contrib = components["tfc"] * weights["tfc"]
-    impacts["tfc_score"] = round(
-        tfc_contrib - baseline * weights["tfc"], 4,
-    )
-
-    # Age/onset impact
     onset_contrib = components["onset"] * weights["onset"]
     impacts["age"] = round(
         onset_contrib - baseline * weights["onset"], 4,
     )
+
+    # Symptom impact (only when symptoms were provided)
+    if "symptoms" in components and "symptoms" in weights:
+        sym_contrib = components["symptoms"] * weights["symptoms"]
+        impacts["symptoms"] = round(
+            sym_contrib - baseline * weights["symptoms"], 4,
+        )
 
     return impacts
 
@@ -525,24 +563,7 @@ def fuse_image_clinical(
     clinical: ClinicalScore,
     image_weight: float = 0.35,
 ) -> ClinicalScore:
-    """Fuse image model prediction with clinical scoring.
-
-    When clinical certainty is high, clinical data dominates.
-    When clinical data is ambiguous, image model has more weight.
-
-    The fusion uses adaptive weighting based on clinical certainty:
-        effective_image_weight = image_weight * (1 - clinical_certainty * 0.6)
-        effective_clinical_weight = 1 - effective_image_weight
-
-    Args:
-        image_hd_prob: Image model probability of disease (0–1).
-        clinical: Clinical scoring result.
-        image_weight: Base weight for image model (0–1).
-
-    Returns:
-        Updated ClinicalScore with fused probabilities.
-    """
-    # Adaptive weighting: reduce image weight when clinical is certain
+    """Fuse image model prediction with digital assessment scoring."""
     effective_image_w = image_weight * (1.0 - clinical.clinical_certainty * 0.6)
     effective_clinical_w = 1.0 - effective_image_w
 
@@ -552,13 +573,10 @@ def fuse_image_clinical(
         clinical.clinical_certainty,
     )
 
-    # Map image_hd_prob to 3-stage probabilities
-    # If image says HD detected (high prob), split between early/advanced
     image_pre_prob = 1.0 - image_hd_prob
     image_early_prob = image_hd_prob * 0.6
     image_advanced_prob = image_hd_prob * 0.4
 
-    # Fuse
     fused_pre = (
         effective_clinical_w * clinical.pre_manifest_prob
         + effective_image_w * image_pre_prob
@@ -572,14 +590,12 @@ def fuse_image_clinical(
         + effective_image_w * image_advanced_prob
     )
 
-    # Normalize
     total = fused_pre + fused_early + fused_advanced
     if total > 0:
         fused_pre /= total
         fused_early /= total
         fused_advanced /= total
 
-    # Determine stage from fused probabilities
     probs = {
         "pre_manifest": fused_pre,
         "early": fused_early,

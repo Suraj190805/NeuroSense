@@ -1,0 +1,76 @@
+================================================================================
+                    NEUROSENSE — SYSTEM ARCHITECTURE SPECIFICATION
+================================================================================
+
+[ COLOR-CODED DATA FLOW & COMPONENT LEGEND ]
+• Green      — Input & Patient Data Acquisition
+• Purple     — AI Modeling & Multimodal Deep Learning Fusion
+• Blue       — API Routing, Data Serialization & Communication
+• Red        — Diagnostic, Prognostic & Explainability (XAI) Outputs
+• Dark Blue  — Cloud Database, Web Dashboard & User Interface Flow
+
+================================================================================
+1. INPUTS & DATA ACQUISITION LAYER (Green)
+================================================================================
+• MRI Brain Scan:
+  - 3D Volumetric T1-Weighted MRI (NIfTI format: .nii, .nii.gz)
+  - 2D Brain MRI Axial Slices (.png, .jpg, .jpeg)
+• Genetic Biomarker:
+  - CAG Trinucleotide Repeat Count (HTT gene exon 1 expansion)
+• Digital Motor & Cognitive Assessment Suite:
+  - Reaction Time & Bradykinesia Latency
+  - 10-Second Finger Tapping Frequency (Hz)
+  - Target Tracking & Hand-Eye Coordination Accuracy
+  - 5-Round Progressive Sequence Memory (Visuospatial Span)
+  - Word Recall with Mathematical Distraction (Verbal Episodic Memory)
+  - Visual Change Detection (Short-Term Feature Binding)
+• Patient Demographics:
+  - Patient Age & Biological Gender
+
+               │ (Green Arrow: Raw Inputs Ingestion)
+               ▼
+
+================================================================================
+2. CENTRAL PROCESSING & MULTIMODAL AI ENGINE (Purple)
+================================================================================
+• 3D ResNet-50 (Volumetric Spatial Encoder):
+  - 3D spatial convolutions extracting dense 2048-D anatomical representations of striatal and cortical atrophy.
+• 2D ResNet-50 (Slice Transfer Learning Encoder):
+  - Fine-tuned ImageNet backbone for rapid at-home 2D slice analysis.
+• Bidirectional LSTM (Longitudinal Temporal Encoder):
+  - 2-layer Bi-LSTM encoding temporal trajectories, rates of decline, and clinical biomarker velocities.
+• Cross-Modal Multi-Head Attention Fusion:
+  - Scaled dot-product bidirectional cross-attention (Visual Query ↔ Clinical Key/Value).
+• Adaptive Certainty & Multimodal Scoring:
+  - Dynamic weighting combining image classifier probabilities with Langbehn genetic disease burden formulas.
+
+               │ (Purple & Red Arrows: Forward & Backward Explainability Paths)
+               ▼
+
+================================================================================
+3. EXPLAINABILITY & PREDICTION OUTPUTS (Red)
+================================================================================
+• GradCAM++ Activation Heatmaps:
+  - 2nd & 3rd-order gradient-weighted spatial heatmaps overlaid on axial MRI slices.
+• SHAP Feature Attribution:
+  - Game-theoretic Shapley value decomposition for CAG, motor, memory, functional capacity, and age.
+• HD Stage Classification:
+  - Probabilistic categorization: Pre-manifest HD | Early HD | Advanced HD.
+• 12-Month & 24-Month Progression Forecast:
+  - Dual-horizon regression index predicting prospective trajectory.
+
+               │ (Blue & Dark Blue Arrows: API & Cloud Persistence)
+               ▼
+
+================================================================================
+4. BACKEND, CLOUD DATABASE & APPLICATION LAYER (Blue / Dark Blue)
+================================================================================
+• FastAPI Backend & Async Inference Pipeline:
+  - RESTful microservice handling asynchronous request validation and model inference.
+• MongoDB Atlas Cloud Database:
+  - Encrypted storage for user accounts, historical predictions, and longitudinal test results.
+• React.js & Three.js Web Dashboard:
+  - Interactive UI with 3D real-time brain rendering, digital testing suite, and PDF clinical reports.
+• End-Users:
+  - Patients, Caregivers, and Neurologists (Remote At-Home Monitoring & Clinical Decision Support).
+================================================================================

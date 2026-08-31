@@ -532,3 +532,111 @@ class GradCAM3D:
             self.cleanup()
         except Exception:
             pass
+
+
+class GradCAM2D:
+    """GradCAM++ explainer for 2D MRI brain slices.
+
+    Computes class activation maps for 2D CNN classifiers (e.g. ResNet-50)
+    to visually highlight regions of structural interest.
+    """
+
+    def __init__(
+        self,
+        model: nn.Module,
+        target_layer: nn.Module | None = None,
+    ) -> None:
+        self.model = model
+        if target_layer is None:
+            if hasattr(model, "backbone") and hasattr(model.backbone, "layer4"):
+                target_layer = model.backbone.layer4[-1]
+            elif hasattr(model, "layer4"):
+                target_layer = model.layer4[-1]
+            else:
+                for m in reversed(list(model.modules())):
+                    if isinstance(m, nn.Conv2d):
+                        target_layer = m
+                        break
+        self.target_layer = target_layer
+        self.activations: list[torch.Tensor] = []
+        self.gradients: list[torch.Tensor] = []
+        self._fhook = None
+        self._bhook = None
+
+        if self.target_layer is not None:
+            self._fhook = self.target_layer.register_forward_hook(
+                lambda m, i, o: self.activations.append(o.detach())
+            )
+            self._bhook = self.target_layer.register_full_backward_hook(
+                lambda m, gi, go: self.gradients.append(go[0].detach())
+            )
+
+    @torch.enable_grad()
+    def generate(
+        self,
+        tensor: torch.Tensor,
+        target_class: int | None = None,
+    ) -> np.ndarray:
+        """Generate a 2D GradCAM++ heatmap normalized in [0, 1]."""
+        self.activations.clear()
+        self.gradients.clear()
+        self.model.eval()
+
+        t = tensor.clone().detach().requires_grad_(True)
+        outputs = self.model(t)
+        logits = outputs["logits"] if isinstance(outputs, dict) else outputs
+
+        if target_class is None:
+            target_class = logits.argmax(dim=1).item()
+
+        score = logits[0, target_class]
+        self.model.zero_grad()
+        score.backward()
+
+        if not self.activations or not self.gradients:
+            h, w = tensor.shape[2], tensor.shape[3]
+            return np.zeros((h, w), dtype=np.float32)
+
+        acts = self.activations[0][0]  # [C, H, W]
+        grads = self.gradients[0][0]  # [C, H, W]
+
+        # GradCAM++ weights calculation
+        grads_power2 = grads.pow(2)
+        grads_power3 = grads.pow(3)
+        sum_acts = acts.sum(dim=(1, 2), keepdim=True)
+        eps = 1e-8
+        aij = grads_power2 / (2.0 * grads_power2 + sum_acts * grads_power3 + eps)
+        weights = (aij * F.relu(grads)).sum(dim=(1, 2), keepdim=True)
+
+        cam = (weights * acts).sum(dim=0).clamp(min=0)
+        cam = cam - cam.min()
+        cam = cam / (cam.max() + eps)
+        cam_np = cam.cpu().numpy()
+
+        # Resize to input tensor size
+        from scipy.ndimage import zoom
+        h_in, w_in = tensor.shape[2], tensor.shape[3]
+        if cam_np.shape != (h_in, w_in):
+            cam_np = zoom(
+                cam_np,
+                (h_in / cam_np.shape[0], w_in / cam_np.shape[1]),
+                order=1,
+            )
+
+        return np.clip(cam_np, 0.0, 1.0)
+
+    def cleanup(self) -> None:
+        """Remove hooks."""
+        if self._fhook is not None:
+            self._fhook.remove()
+        if self._bhook is not None:
+            self._bhook.remove()
+        self.activations.clear()
+        self.gradients.clear()
+
+    def __del__(self) -> None:
+        try:
+            self.cleanup()
+        except Exception:
+            pass
+

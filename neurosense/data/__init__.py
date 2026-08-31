@@ -23,13 +23,29 @@ from neurosense.data.preprocessing import (
     get_train_transforms,
     get_val_transforms,
 )
+from neurosense.data.harmonizer import (
+    MRIHarmonizer,
+    harmonize_2d_slice,
+    harmonize_3d_volume,
+)
+from neurosense.data.hd_image_dataset import (
+    HDImageDataset,
+    get_2d_train_transforms,
+    get_2d_val_transforms,
+)
 
 __all__ = [
     "HuntingtonDataset",
+    "HDImageDataset",
     "ClinicalNormalizer",
     "get_train_transforms",
     "get_val_transforms",
+    "get_2d_train_transforms",
+    "get_2d_val_transforms",
     "CLINICAL_FEATURE_NAMES",
     "STAGE_NAMES",
     "STAGE_LABELS",
+    "MRIHarmonizer",
+    "harmonize_2d_slice",
+    "harmonize_3d_volume",
 ]

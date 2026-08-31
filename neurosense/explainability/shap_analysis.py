@@ -37,22 +37,27 @@ import torch.nn as nn
 
 logger = logging.getLogger(__name__)
 
-# Clinical feature names matching dataset column order
+# Feature names matching input column order
 CLINICAL_FEATURE_NAMES: list[str] = [
     "cag_repeat",
-    "uhdrs_motor",
-    "uhdrs_cognitive",
-    "tfc",
+    "motor_score",
+    "memory_score",
+    "functional_score",
     "age",
 ]
 
-# Clinical feature descriptions for reporting
+# Feature descriptions for reporting & XAI visualization
 CLINICAL_FEATURE_DESCRIPTIONS: dict[str, str] = {
     "cag_repeat": "CAG Repeat Count",
-    "uhdrs_motor": "UHDRS Motor Score",
-    "uhdrs_cognitive": "UHDRS Cognitive Score",
-    "tfc": "Total Functional Capacity (TFC)",
+    "motor_score": "Digital Motor Performance",
+    "memory_score": "Memory & Cognitive Score",
+    "functional_score": "Daily Functional Capacity",
     "age": "Patient Age",
+    # Legacy aliases
+    "uhdrs_motor": "Digital Motor Performance",
+    "uhdrs_cognitive": "Memory & Cognitive Score",
+    "tfc": "Daily Functional Capacity",
+    "tfc_score": "Daily Functional Capacity",
 }
 
 

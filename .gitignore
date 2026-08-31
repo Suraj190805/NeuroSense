@@ -1,0 +1,44 @@
+# ─── OS ───
+.DS_Store
+Thumbs.db
+
+# ─── Environment Files ───
+.env
+.env.*
+!.env.example
+
+# ─── Python ───
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+venv/
+.venv/
+env/
+
+# ─── Node / Frontend ───
+node_modules/
+dist/
+build/
+.vite/
+
+# ─── IDE ───
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ─── Checkpoints & Large Data ───
+*.pth
+*.pt
+*.ckpt
+*.nii
+*.nii.gz
+checkpoints/
+saved_models/
+
+# ─── Logs ───
+*.log
+logs/

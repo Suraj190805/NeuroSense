@@ -11,9 +11,9 @@ HD neuroimaging hallmarks that this script simulates:
     - Striatal volume loss
 
 Usage:
-    python -m neurosense.scripts.generate_hd_augmented_data \\
-        --source-dir data/parkinsons/parkinsons_dataset/normal \\
-        --output-dir data/hd_augmented/huntington \\
+    python -m neurosense.scripts.generate_hd_augmented_data \
+        --source-dir data/hd_training/raw_normal \
+        --output-dir data/hd_augmented/huntington \
         --num-augmentations 5
 
     This takes normal brain MRI images and creates simulated
@@ -22,8 +22,8 @@ Usage:
 
 For future retraining, copy augmented images into your
 dataset directory and retrain:
-    python -m neurosense.training.train_parkinsons \\
-        --data-root data/hd_augmented \\
+    python -m neurosense.training.train \
+        --data-root data/hd_augmented \
         --epochs 30
 """
 
@@ -352,7 +352,7 @@ def main() -> None:
     parser.add_argument(
         "--source-dir",
         type=str,
-        default="data/parkinsons/parkinsons_dataset/normal",
+        default="data/hd_training/raw_normal",
         help="Source directory with normal brain MRI images",
     )
     parser.add_argument(
@@ -421,7 +421,7 @@ def main() -> None:
     print(f"  Augmented HD:      {hd_count}")
     print(f"  Output directory:  {Path(args.output_dir).parent}")
     print(f"\nTo retrain with augmented data:")
-    print(f"  python -m neurosense.training.train_parkinsons \\")
+    print(f"  python -m neurosense.training.train \\")
     print(f"    --data-root {Path(args.output_dir).parent} \\")
     print(f"    --epochs 30")
     print(f"{'='*50}")

@@ -18,17 +18,14 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class ClinicalInput(BaseModel):
-    """Clinical data for HD prediction.
+    """Clinical & digital assessment data for HD prediction.
 
-    Represents the clinical measurements provided alongside
-    MRI data for multi-modal prediction (PRD Section 5.1).
-
-    All fields have clinical validation ranges based on
-    established assessment scales.
+    Represents patient biomarkers and self-administered digital test
+    scores provided alongside MRI data for multi-modal prediction.
     """
 
     cag_repeat: float = Field(
@@ -44,39 +41,39 @@ class ClinicalInput(BaseModel):
         json_schema_extra={"example": 44.0},
     )
 
-    uhdrs_motor: float = Field(
-        ...,
+    motor_score: float = Field(
+        default=85.0,
         ge=0.0,
-        le=124.0,
+        le=100.0,
         description=(
-            "UHDRS Total Motor Score (TMS). "
-            "Assesses motor function across 15 items. "
-            "0 = no motor abnormalities, 124 = maximum impairment."
+            "Digital Motor Assessment Score (0–100%). "
+            "Evaluates reaction speed, finger tapping, and coordination tracking. "
+            "100% = normal / excellent motor speed, 0% = severe motor impairment."
         ),
-        json_schema_extra={"example": 18.0},
+        json_schema_extra={"example": 82.0},
     )
 
-    uhdrs_cognitive: float = Field(
-        ...,
+    memory_score: float = Field(
+        default=85.0,
         ge=0.0,
+        le=100.0,
         description=(
-            "UHDRS Cognitive Assessment composite score. "
-            "Includes Symbol Digit Modalities, Stroop, "
-            "and verbal fluency tests. Higher = better function."
+            "Digital Memory & Cognitive Assessment Score (0–100%). "
+            "Evaluates word recall, sequence working memory, and visual change detection. "
+            "100% = normal / excellent memory function, 0% = severe cognitive decline."
         ),
-        json_schema_extra={"example": 142.0},
+        json_schema_extra={"example": 88.0},
     )
 
-    tfc_score: float = Field(
-        default=13.0,
+    functional_score: float = Field(
+        default=100.0,
         ge=0.0,
-        le=13.0,
+        le=100.0,
         description=(
-            "Total Functional Capacity score. "
-            "13 = fully functional, 0 = total disability. "
-            "Used for HD staging (Shoulson-Fahn)."
+            "Daily Functional Independence Score (0–100%). "
+            "100% = fully independent in daily activities, 0% = total dependency."
         ),
-        json_schema_extra={"example": 9.0},
+        json_schema_extra={"example": 90.0},
     )
 
     age: float = Field(
@@ -89,6 +86,43 @@ class ClinicalInput(BaseModel):
         ),
         json_schema_extra={"example": 42.0},
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def handle_legacy_fields(cls, data: Any) -> Any:
+        """Handle legacy UHDRS and TFC field names for backwards compatibility."""
+        if isinstance(data, dict):
+            # Map legacy uhdrs_motor (0-124, lower=better) -> motor_score (0-100%, higher=better)
+            if "motor_score" not in data and "uhdrs_motor" in data:
+                uhdrs_m = float(data["uhdrs_motor"])
+                data["motor_score"] = max(0.0, min(100.0, 100.0 - (uhdrs_m / 124.0 * 100.0)))
+
+            # Map legacy uhdrs_cognitive (composite >=0) -> memory_score (0-100%)
+            if "memory_score" not in data and "uhdrs_cognitive" in data:
+                uhdrs_c = float(data["uhdrs_cognitive"])
+                data["memory_score"] = max(0.0, min(100.0, (uhdrs_c / 200.0) * 100.0))
+
+            # Map legacy tfc_score (0-13) -> functional_score (0-100%)
+            if "functional_score" not in data and "tfc_score" in data:
+                tfc = float(data["tfc_score"])
+                data["functional_score"] = max(0.0, min(100.0, (tfc / 13.0) * 100.0))
+
+        return data
+
+    @property
+    def uhdrs_motor(self) -> float:
+        """Legacy accessor for UHDRS Motor Score estimate."""
+        return max(0.0, min(124.0, (100.0 - self.motor_score) / 100.0 * 124.0))
+
+    @property
+    def uhdrs_cognitive(self) -> float:
+        """Legacy accessor for UHDRS Cognitive Score estimate."""
+        return self.memory_score * 2.0
+
+    @property
+    def tfc_score(self) -> float:
+        """Legacy accessor for TFC score estimate."""
+        return max(0.0, min(13.0, (self.functional_score / 100.0) * 13.0))
 
     @field_validator("cag_repeat")
     @classmethod
@@ -105,17 +139,17 @@ class ClinicalInput(BaseModel):
         """Convert to ordered feature list for model input.
 
         Returns feature values in the order expected by the
-        clinical encoder: [CAG, UHDRS motor, UHDRS cognitive,
-        TFC, age].
+        clinical encoder: [CAG, motor_score, memory_score,
+        functional_score, age].
 
         Returns:
             List of 5 float values.
         """
         return [
             self.cag_repeat,
-            self.uhdrs_motor,
-            self.uhdrs_cognitive,
-            self.tfc_score,
+            self.motor_score,
+            self.memory_score,
+            self.functional_score,
             self.age,
         ]
 

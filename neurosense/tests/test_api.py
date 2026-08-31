@@ -20,7 +20,25 @@ class TestClinicalInput:
     """Test suite for ClinicalInput Pydantic schema."""
 
     def test_valid_input(self):
-        """Valid clinical data creates ClinicalInput successfully."""
+        """Valid digital assessment data creates ClinicalInput successfully."""
+        from neurosense.api.schemas import ClinicalInput
+
+        data = ClinicalInput(
+            cag_repeat=44.0,
+            motor_score=85.0,
+            memory_score=90.0,
+            functional_score=100.0,
+            age=42.0,
+        )
+
+        assert data.cag_repeat == 44.0
+        assert data.motor_score == 85.0
+        assert data.memory_score == 90.0
+        assert data.functional_score == 100.0
+        assert data.age == 42.0
+
+    def test_legacy_input_compatibility(self):
+        """Legacy UHDRS fields are converted to digital assessment percentages."""
         from neurosense.api.schemas import ClinicalInput
 
         data = ClinicalInput(
@@ -32,7 +50,9 @@ class TestClinicalInput:
         )
 
         assert data.cag_repeat == 44.0
-        assert data.uhdrs_motor == 18.0
+        assert 80.0 <= data.motor_score <= 90.0
+        assert data.memory_score == 71.0
+        assert 65.0 <= data.functional_score <= 75.0
         assert data.age == 42.0
 
     def test_cag_below_threshold_raises(self):
@@ -44,13 +64,13 @@ class TestClinicalInput:
         with pytest.raises(ValidationError):
             ClinicalInput(
                 cag_repeat=30.0,  # Below HD threshold
-                uhdrs_motor=18.0,
-                uhdrs_cognitive=142.0,
+                motor_score=85.0,
+                memory_score=90.0,
                 age=42.0,
             )
 
-    def test_uhdrs_motor_above_max_raises(self):
-        """UHDRS motor score above 124 raises validation error."""
+    def test_motor_score_above_max_raises(self):
+        """Motor score above 100 raises validation error."""
         from pydantic import ValidationError
 
         from neurosense.api.schemas import ClinicalInput
@@ -58,8 +78,8 @@ class TestClinicalInput:
         with pytest.raises(ValidationError):
             ClinicalInput(
                 cag_repeat=44.0,
-                uhdrs_motor=130.0,  # Above max
-                uhdrs_cognitive=142.0,
+                motor_score=120.0,  # Above max (100)
+                memory_score=90.0,
                 age=42.0,
             )
 
@@ -72,23 +92,23 @@ class TestClinicalInput:
         with pytest.raises(ValidationError):
             ClinicalInput(
                 cag_repeat=44.0,
-                uhdrs_motor=18.0,
-                uhdrs_cognitive=142.0,
+                motor_score=85.0,
+                memory_score=90.0,
                 age=10.0,  # Too young
             )
 
-    def test_tfc_defaults_to_13(self):
-        """TFC score defaults to 13.0 when not provided."""
+    def test_functional_score_defaults_to_100(self):
+        """Functional score defaults to 100.0 when not provided."""
         from neurosense.api.schemas import ClinicalInput
 
         data = ClinicalInput(
             cag_repeat=44.0,
-            uhdrs_motor=18.0,
-            uhdrs_cognitive=142.0,
+            motor_score=85.0,
+            memory_score=90.0,
             age=42.0,
         )
 
-        assert data.tfc_score == 13.0
+        assert data.functional_score == 100.0
 
     def test_to_tensor_list(self):
         """to_tensor_list() returns correct ordered values."""
@@ -96,15 +116,15 @@ class TestClinicalInput:
 
         data = ClinicalInput(
             cag_repeat=44.0,
-            uhdrs_motor=18.0,
-            uhdrs_cognitive=142.0,
-            tfc_score=9.0,
+            motor_score=85.0,
+            memory_score=90.0,
+            functional_score=100.0,
             age=42.0,
         )
 
         result = data.to_tensor_list()
 
-        assert result == [44.0, 18.0, 142.0, 9.0, 42.0]
+        assert result == [44.0, 85.0, 90.0, 100.0, 42.0]
         assert len(result) == 5
 
 

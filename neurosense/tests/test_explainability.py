@@ -9,7 +9,10 @@ Tests for GradCAM++ and SHAP explainability:
 from __future__ import annotations
 
 import numpy as np
-import pytest
+try:
+    import pytest
+except ImportError:
+    pytest = None
 import torch
 
 
@@ -207,3 +210,37 @@ class TestVisualisation:
 
         assert isinstance(fig, plt.Figure)
         plt.close(fig)
+
+    def test_analyze_brain_regions(self):
+        """analyze_brain_regions returns detected brain anatomy and color guide."""
+        from neurosense.explainability.visualise import analyze_brain_regions
+
+        heatmap = np.zeros((100, 100), dtype=np.float32)
+        # Put peak at caudate position
+        heatmap[38, 40] = 1.0
+
+        res = analyze_brain_regions(heatmap)
+        assert "primary_region" in res
+        assert "Left Caudate" in res["primary_region"] or "Caudate" in res["primary_region"]
+        assert len(res["detected_regions"]) > 0
+        assert len(res["color_meanings"]) == 4
+
+    def test_save_2d_heatmap_overlay(self, tmp_path=None):
+        """save_2d_heatmap_overlay generates image with color guide and anatomy."""
+        import tempfile
+        from pathlib import Path
+        from neurosense.explainability.visualise import save_2d_heatmap_overlay
+
+        img = np.random.rand(100, 100).astype(np.float32)
+        heatmap = np.random.rand(100, 100).astype(np.float32)
+
+        with tempfile.TemporaryDirectory() as td:
+            out_file = Path(td) / "overlay_test.png"
+            res_path = save_2d_heatmap_overlay(
+                image=img,
+                heatmap=heatmap,
+                output_path=out_file,
+                title="Test Heatmap",
+            )
+            assert res_path.exists()
+            assert res_path.stat().st_size > 0

@@ -198,12 +198,35 @@ class StageProbabilities(BaseModel):
     )
 
 
+class DetectedBrainRegion(BaseModel):
+    """Anatomical brain structure evaluated in GradCAM++ heatmap."""
+
+    id: str = Field(..., description="Unique structure identifier")
+    name: str = Field(..., description="Full anatomical name (e.g. Caudate Nucleus)")
+    short_name: str = Field(..., description="Short display name")
+    hemisphere: str = Field(..., description="Left, Right, or Bilateral")
+    score: float = Field(..., description="Normalized attention score [0, 1]")
+    percentage: int = Field(..., description="Attention percentage (0-100%)")
+    severity: str = Field(..., description="Attention level: Critical, Moderate, Mild, or Baseline")
+    clinical: str = Field(..., description="Pathological relevance to Huntington's Disease")
+
+
+class HeatmapColorMeaning(BaseModel):
+    """Explanation of a specific color band in the GradCAM++ heatmap."""
+
+    color: str = Field(..., description="Color name (Red, Yellow, Blue, etc.)")
+    tag: str = Field(..., description="Legend tag with range (e.g. RED (80-100%))")
+    hex: str = Field(..., description="Hex color code for rendering")
+    level: str = Field(..., description="Clinical attention level")
+    meaning: str = Field(..., description="Detailed clinical interpretation")
+
+
 class PredictionResponse(BaseModel):
     """Full HD prediction response.
 
     Contains staging classification, progression forecasts,
-    and explainability outputs (GradCAM++ heatmap URL and
-    SHAP feature attributions).
+    and explainability outputs (GradCAM++ heatmap URL,
+    brain region attributions, and SHAP feature attributions).
     """
 
     # ─── Classification ───
@@ -261,6 +284,22 @@ class PredictionResponse(BaseModel):
             "Available when MRI is provided."
         ),
         json_schema_extra={"example": "/static/heatmaps/abc123.png"},
+    )
+
+    detected_brain_regions: list[DetectedBrainRegion] = Field(
+        default_factory=list,
+        description="Key brain structures evaluated in GradCAM++ ordered by neural attention",
+    )
+
+    primary_brain_region: str | None = Field(
+        default=None,
+        description="Primary anatomical brain structure driving prediction",
+        json_schema_extra={"example": "Bilateral Caudate Nuclei"},
+    )
+
+    heatmap_color_guide: list[HeatmapColorMeaning] = Field(
+        default_factory=list,
+        description="Guide explaining what colors represent in the GradCAM++ heatmap",
     )
 
     shap_features: list[SHAPFeature] = Field(

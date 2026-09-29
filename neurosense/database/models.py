@@ -139,6 +139,30 @@ class PredictionDocument(BaseModel):
         default=0.0,
         description="Predicted 24-month progression score change",
     )
+    doctorId: str | None = Field(
+        default=None,
+        description="Reference to the doctor who performed the analysis",
+    )
+    doctorName: str | None = Field(
+        default=None,
+        description="Full name of the doctor who performed the analysis",
+    )
+    doctorEmail: str | None = Field(
+        default=None,
+        description="Email address of the doctor who performed the analysis",
+    )
+    patientId: str | None = Field(
+        default=None,
+        description="Reference to the patient this analysis was performed for",
+    )
+    patientName: str | None = Field(
+        default=None,
+        description="Full name of the patient",
+    )
+    patientEmail: str | None = Field(
+        default=None,
+        description="Email address of the patient",
+    )
     createdAt: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         description="UTC timestamp of the prediction",

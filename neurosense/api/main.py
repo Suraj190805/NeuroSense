@@ -72,6 +72,7 @@ from neurosense.database.crud import (
     get_test_results,
     get_user_by_email,
     get_user_by_id,
+    list_patients,
     list_users,
     save_prediction,
     save_test_result,
@@ -291,6 +292,8 @@ async def predict_image(
         description="Comma-separated symptom IDs (e.g. 'chorea,dystonia,depression'). Optional.",
     ),
     user_id: str = Form(default="anonymous", description="Logged-in user ID"),
+    patient_id: str | None = Form(default=None, description="Assigned patient ID if performed by a doctor"),
+    doctor_id: str | None = Form(default=None, description="Doctor user ID if performed by a doctor"),
 ) -> PredictionResponse:
     """Predict HD stage from brain MRI image + digital assessment scores.
 
@@ -432,21 +435,32 @@ async def predict_image(
 
         # Generate 2D GradCAM++ heatmap overlay
         gradcam_url = None
+        detected_brain_regions = []
+        primary_brain_region = None
+        heatmap_color_guide = []
         try:
             from neurosense.explainability.gradcam import GradCAM2D
-            from neurosense.explainability.visualise import save_2d_heatmap_overlay
+            from neurosense.explainability.visualise import (
+                analyze_brain_regions,
+                save_2d_heatmap_overlay,
+            )
 
             cam_explainer = GradCAM2D(model)
             cam = cam_explainer.generate(tensor)
             heatmap_file = HEATMAP_DIR / f"{request_id}.png"
+            region_analysis = analyze_brain_regions(cam)
             save_2d_heatmap_overlay(
                 image=image,
                 heatmap=cam,
                 output_path=heatmap_file,
                 title=f"GradCAM++ Brain Heatmap — {fused.stage.replace('_', ' ').title()}",
+                region_analysis=region_analysis,
             )
             gradcam_url = f"/static/heatmaps/{request_id}.png"
-            logger.info("2D GradCAM++ heatmap generated: %s", gradcam_url)
+            detected_brain_regions = region_analysis.get("detected_regions", [])
+            primary_brain_region = region_analysis.get("primary_region")
+            heatmap_color_guide = region_analysis.get("color_meanings", [])
+            logger.info("2D GradCAM++ heatmap generated: %s (Target: %s)", gradcam_url, primary_brain_region)
         except Exception as cam_err:
             logger.warning("2D GradCAM++ generation failed: %s", cam_err)
             gradcam_url = None
@@ -486,6 +500,9 @@ async def predict_image(
             progression_24mo=fused.progression_24mo,
             risk_category=fused.risk_category,
             gradcam_url=gradcam_url,
+            detected_brain_regions=detected_brain_regions,
+            primary_brain_region=primary_brain_region,
+            heatmap_color_guide=heatmap_color_guide,
             shap_features=shap_features,
             processing_time_s=round(processing_time, 2),
             request_id=request_id,
@@ -515,8 +532,34 @@ async def predict_image(
                     "medium": "Medium",
                     "high": "High",
                 }
+
+                # Determine target user ID (patient if assigned, otherwise user_id)
+                target_user_id = patient_id if (patient_id and str(patient_id).strip() not in ("null", "undefined", "None", "")) else user_id
+                doc_user_id = doctor_id if (doctor_id and str(doctor_id).strip() not in ("null", "undefined", "None", "")) else (user_id if patient_id else None)
+
+                # Fetch patient and doctor profile info if available
+                p_name, p_email = None, None
+                d_name, d_email = None, None
+                if target_user_id and target_user_id != "anonymous":
+                    try:
+                        p_doc = await get_user_by_id(target_user_id)
+                        if p_doc:
+                            p_name = p_doc.get("name")
+                            p_email = p_doc.get("email")
+                    except Exception:
+                        pass
+
+                if doc_user_id and doc_user_id != "anonymous":
+                    try:
+                        d_doc = await get_user_by_id(doc_user_id)
+                        if d_doc:
+                            d_name = d_doc.get("name")
+                            d_email = d_doc.get("email")
+                    except Exception:
+                        pass
+
                 pred_doc = PredictionDocument(
-                    userId=user_id,
+                    userId=target_user_id,
                     prediction=stage_labels.get(fused.stage, fused.stage),
                     confidence=min(100.0, max(0.0, round(fused.confidence * 100, 1))),
                     riskLevel=risk_labels.get(fused.risk_category, fused.risk_category),
@@ -536,9 +579,15 @@ async def predict_image(
                     },
                     progression12mo=round(fused.progression_12mo, 2) if fused.progression_12mo is not None else 0.0,
                     progression24mo=round(fused.progression_24mo, 2) if fused.progression_24mo is not None else 0.0,
+                    doctorId=doc_user_id,
+                    doctorName=d_name,
+                    doctorEmail=d_email,
+                    patientId=target_user_id if target_user_id != user_id or patient_id else None,
+                    patientName=p_name,
+                    patientEmail=p_email,
                 )
                 await save_prediction(pred_doc)
-                logger.info("Successfully persisted image prediction to MongoDB for user=%s", user_id)
+                logger.info("Successfully persisted image prediction to MongoDB for user=%s (doctor=%s)", target_user_id, doc_user_id)
             except Exception as db_err:
                 logger.warning("Failed to save prediction to DB: %s", db_err, exc_info=True)
 
@@ -838,6 +887,8 @@ async def predict(
         default="anonymous",
         description="Logged-in user ID for linking predictions to accounts",
     ),
+    patient_id: str | None = Form(default=None, description="Assigned patient ID if performed by a doctor"),
+    doctor_id: str | None = Form(default=None, description="Doctor user ID if performed by a doctor"),
 ) -> PredictionResponse:
     """Run HD prediction with full explainability pipeline.
 
@@ -991,8 +1042,34 @@ async def predict(
                     "medium": "Medium",
                     "high": "High",
                 }
+
+                # Determine target user ID (patient if assigned, otherwise user_id)
+                target_user_id = patient_id if (patient_id and str(patient_id).strip() not in ("null", "undefined", "None", "")) else user_id
+                doc_user_id = doctor_id if (doctor_id and str(doctor_id).strip() not in ("null", "undefined", "None", "")) else (user_id if patient_id else None)
+
+                # Fetch patient and doctor profile info if available
+                p_name, p_email = None, None
+                d_name, d_email = None, None
+                if target_user_id and target_user_id != "anonymous":
+                    try:
+                        p_doc = await get_user_by_id(target_user_id)
+                        if p_doc:
+                            p_name = p_doc.get("name")
+                            p_email = p_doc.get("email")
+                    except Exception:
+                        pass
+
+                if doc_user_id and doc_user_id != "anonymous":
+                    try:
+                        d_doc = await get_user_by_id(doc_user_id)
+                        if d_doc:
+                            d_name = d_doc.get("name")
+                            d_email = d_doc.get("email")
+                    except Exception:
+                        pass
+
                 pred_doc = PredictionDocument(
-                    userId=user_id,
+                    userId=target_user_id,
                     prediction=stage_labels.get(result.stage, result.stage),
                     confidence=min(100.0, max(0.0, round(result.confidence * 100, 1))),
                     riskLevel=risk_labels.get(result.risk_category, result.risk_category),
@@ -1012,9 +1089,15 @@ async def predict(
                     },
                     progression12mo=round(result.progression_12mo, 2) if result.progression_12mo is not None else 0.0,
                     progression24mo=round(result.progression_24mo, 2) if result.progression_24mo is not None else 0.0,
+                    doctorId=doc_user_id,
+                    doctorName=d_name,
+                    doctorEmail=d_email,
+                    patientId=target_user_id if target_user_id != user_id or patient_id else None,
+                    patientName=p_name,
+                    patientEmail=p_email,
                 )
                 await save_prediction(pred_doc)
-                logger.info("Successfully persisted prediction to MongoDB for user=%s", user_id)
+                logger.info("Successfully persisted prediction to MongoDB for user=%s (doctor=%s)", target_user_id, doc_user_id)
             except Exception as db_err:
                 logger.warning("Failed to save prediction to DB: %s", db_err, exc_info=True)
 
@@ -1182,6 +1265,26 @@ async def list_users_endpoint(
 
     users = await list_users(skip=skip, limit=limit)
     return {"users": users, "count": len(users)}
+
+
+@app.get(
+    "/patients",
+    summary="List Registered Patients",
+    description="List all registered patients for doctor selection and assignment.",
+    tags=["Users"],
+)
+async def list_patients_endpoint(
+    skip: int = 0,
+    limit: int = 200,
+):
+    """List all registered patients for doctor selection."""
+    if not is_connected():
+        await ensure_connected()
+    if not is_connected():
+        raise HTTPException(503, "Database not available")
+
+    patients = await list_patients(skip=skip, limit=limit)
+    return {"patients": patients, "count": len(patients)}
 
 
 @app.get(

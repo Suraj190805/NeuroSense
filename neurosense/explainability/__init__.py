@@ -20,10 +20,12 @@ from neurosense.explainability.shap_analysis import (
     SHAPExplainer,
 )
 from neurosense.explainability.visualise import (
+    analyze_brain_regions,
     create_report_figure,
     overlay_gradcam_on_slices,
     overlay_single_slice,
     plot_shap_waterfall,
+    save_2d_heatmap_overlay,
     save_heatmap_image,
     save_shap_image,
 )
@@ -35,10 +37,12 @@ __all__ = [
     "SHAPExplainer",
     "CLINICAL_FEATURE_NAMES",
     # Visualization
+    "analyze_brain_regions",
     "overlay_gradcam_on_slices",
     "overlay_single_slice",
     "plot_shap_waterfall",
     "create_report_figure",
+    "save_2d_heatmap_overlay",
     "save_heatmap_image",
     "save_shap_image",
 ]

@@ -158,6 +158,33 @@ async def list_users(
     return _serialize_list(docs)
 
 
+async def list_patients(
+    skip: int = 0,
+    limit: int = 200,
+) -> list[dict[str, Any]]:
+    """List all registered patients for doctor selection.
+
+    Args:
+        skip: Number of records to skip.
+        limit: Maximum number of records to return.
+
+    Returns:
+        List of patient user documents (passwords and heavy arrays excluded).
+    """
+    db = get_database()
+    cursor = (
+        db.users.find(
+            {"role": "patient"},
+            {"password": 0, "predictions": 0, "tests": 0},
+        )
+        .sort("name", 1)
+        .skip(skip)
+        .limit(limit)
+    )
+    docs = await cursor.to_list(length=limit)
+    return _serialize_list(docs)
+
+
 # ═════════════════════════════════════════════════════════════════
 #  Predictions (embedded inside user documents)
 # ═════════════════════════════════════════════════════════════════
@@ -168,6 +195,8 @@ async def save_prediction(prediction: PredictionDocument) -> str:
 
     For logged-in users: pushes into the user's embedded
     ``predictions`` array — keeping all data under one document.
+    If performed by a doctor on a patient, pushes to both the patient's
+    and doctor's document.
 
     For anonymous users: inserts into the standalone
     ``predictions`` collection as a fallback.
@@ -182,9 +211,10 @@ async def save_prediction(prediction: PredictionDocument) -> str:
     db = get_database()
     doc = prediction.model_dump()
     user_id = doc.get("userId", "anonymous")
+    doctor_id = doc.get("doctorId")
 
     if user_id and str(user_id).strip() not in ("anonymous", "null", "undefined", "None", ""):
-        # ── Embed inside user document ──
+        # ── Embed inside user document (e.g. Patient) ──
         import uuid
 
         pred_id = str(uuid.uuid4())[:12]
@@ -203,6 +233,18 @@ async def save_prediction(prediction: PredictionDocument) -> str:
                         pred_id, user_id,
                         prediction.prediction, prediction.riskLevel,
                     )
+
+                    # Also embed in Doctor's document if doctor is distinct from patient
+                    if doctor_id and str(doctor_id) != str(user_id) and ObjectId.is_valid(str(doctor_id)):
+                        try:
+                            await db.users.update_one(
+                                {"_id": ObjectId(str(doctor_id))},
+                                {"$push": {"predictions": doc}},
+                            )
+                            logger.info("Also embedded prediction %s in doctor=%s", pred_id, doctor_id)
+                        except Exception as doc_err:
+                            logger.warning("Could not embed prediction in doctor %s: %s", doctor_id, doc_err)
+
                     return pred_id
                 else:
                     logger.warning(

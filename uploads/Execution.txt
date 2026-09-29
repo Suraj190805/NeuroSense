@@ -1,0 +1,2 @@
+To run the frontend : npm run dev 
+To run the server : uvicorn neurosense.api.main:app --host 0.0.0.0 --port 8000 --reload

@@ -37,6 +37,7 @@ from pathlib import Path
 from typing import Any
 
 import matplotlib
+import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -179,17 +180,31 @@ def overlay_gradcam_on_slices(
         ax.set_visible(False)
 
     # Colourbar
-    cbar_ax = fig.add_axes([0.92, 0.15, 0.02, 0.65])
+    cbar_ax = fig.add_axes([0.92, 0.18, 0.02, 0.60])
     sm = plt.cm.ScalarMappable(
         cmap=colormap, norm=plt.Normalize(0, 1)
     )
     sm.set_array([])
     cbar = fig.colorbar(sm, cax=cbar_ax)
-    cbar.set_label("Activation Intensity", color=TEXT_COLOR, fontsize=10)
+    cbar.set_ticks([0.05, 0.25, 0.50, 0.75, 1.0])
+    cbar.set_ticklabels(
+        ["0% (Preserved)", "25%", "50% (Moderate)", "75%", "100% (Critical)"],
+        color=TEXT_COLOR,
+        fontsize=8,
+    )
+    cbar.set_label("Neural Activation & Pathological Weight", color="#00b4d8", fontsize=9, fontweight="bold")
     cbar.ax.tick_params(colors=TEXT_COLOR)
 
+    # Subtitle / footer explaining colors and brain parts
+    fig.text(
+        0.46, 0.012,
+        "● Red (80-100%): Critical Atrophy Focus  |  ● Yellow (50-80%): Moderate  |  ● Blue (5-50%): Preserved Tissue Baseline\n"
+        "Key Anatomical HD Targets: Striatum (Caudate Nucleus & Putamen) • Lateral Ventricles • Frontal Cortex",
+        ha="center", va="center", color=TEXT_COLOR, fontsize=8.5, linespacing=1.35
+    )
+
     fig.subplots_adjust(
-        left=0.02, right=0.90, top=0.92, bottom=0.02,
+        left=0.02, right=0.90, top=0.92, bottom=0.04,
         hspace=0.15, wspace=0.05,
     )
 
@@ -700,6 +715,190 @@ def _risk_color(risk: str) -> str:
     return risk_colors.get(risk.lower(), TEXT_COLOR)
 
 
+def analyze_brain_regions(heatmap: np.ndarray) -> dict[str, Any]:
+    """Analyze GradCAM++ heatmap activation across anatomical brain regions.
+
+    Quantifies neural attention across key cranial structures implicated in
+    Huntington's Disease (striatum, caudate nucleus, putamen, lateral ventricles,
+    frontal cortex, temporal/insular cortex, parieto-occipital region).
+
+    Args:
+        heatmap: 2D or 3D numpy array of activation intensities in [0, 1].
+
+    Returns:
+        Dictionary containing primary targeted region, regional scores,
+        peak coordinates, and semantic color meanings.
+    """
+    if heatmap.ndim == 3:
+        # Take max projection or mid slice along shortest axis
+        if heatmap.shape[0] <= heatmap.shape[1] and heatmap.shape[0] <= heatmap.shape[2]:
+            heatmap_2d = np.max(heatmap, axis=0)
+        else:
+            mid = heatmap.shape[2] // 2
+            heatmap_2d = heatmap[:, :, mid]
+    else:
+        heatmap_2d = heatmap
+
+    h, w = heatmap_2d.shape[:2]
+    y_grid, x_grid = np.ogrid[:h, :w]
+    ny = y_grid / float(max(h, 1))
+    nx = x_grid / float(max(w, 1))
+
+    regions_def = [
+        {
+            "id": "caudate_bilateral",
+            "name": "Bilateral Caudate Nuclei",
+            "short_name": "Caudate Nuclei",
+            "hemisphere": "Bilateral",
+            "mask": (((nx >= 0.32) & (nx <= 0.44)) | ((nx >= 0.56) & (nx <= 0.68))) & ((ny >= 0.30) & (ny <= 0.48)),
+            "clinical": "Hallmark HD neurodegeneration. Loss of GABAergic medium spiny neurons directly correlates with CAG repeat expansion.",
+        },
+        {
+            "id": "caudate_left",
+            "name": "Left Caudate Nucleus",
+            "short_name": "Left Caudate",
+            "hemisphere": "Left",
+            "mask": ((nx >= 0.32) & (nx <= 0.44)) & ((ny >= 0.30) & (ny <= 0.48)),
+            "clinical": "Subcortical striatal volume loss; critical driver of cognitive and motor staging.",
+        },
+        {
+            "id": "caudate_right",
+            "name": "Right Caudate Nucleus",
+            "short_name": "Right Caudate",
+            "hemisphere": "Right",
+            "mask": ((nx >= 0.56) & (nx <= 0.68)) & ((ny >= 0.30) & (ny <= 0.48)),
+            "clinical": "Hallmark early HD atrophy; bilateral degeneration drives motor incoordination and chorea.",
+        },
+        {
+            "id": "putamen_bilateral",
+            "name": "Striatum / Putamen",
+            "short_name": "Putamen",
+            "hemisphere": "Bilateral",
+            "mask": (((nx >= 0.20) & (nx <= 0.34)) | ((nx >= 0.66) & (nx <= 0.80))) & ((ny >= 0.40) & (ny <= 0.62)),
+            "clinical": "Basal ganglia motor circuit component; progressive degeneration triggers choreic movements and dystonia.",
+        },
+        {
+            "id": "lateral_ventricles",
+            "name": "Lateral Ventricles (Frontal Horns)",
+            "short_name": "Lateral Ventricles",
+            "hemisphere": "Bilateral",
+            "mask": ((nx >= 0.42) & (nx <= 0.58)) & ((ny >= 0.30) & (ny <= 0.60)),
+            "clinical": "Ex-vacuo ventriculomegaly (enlargement) secondary to progressive shrinkage of surrounding striatal tissue.",
+        },
+        {
+            "id": "frontal_cortex",
+            "name": "Frontal Cortex & Prefrontal Lobe",
+            "short_name": "Frontal Cortex",
+            "hemisphere": "Bilateral",
+            "mask": ((ny < 0.30) & (nx >= 0.20) & (nx <= 0.80)),
+            "clinical": "Cortical thinning driving executive dysfunction, apathy, and cognitive slowing.",
+        },
+        {
+            "id": "temporal_cortex",
+            "name": "Temporal / Insular Cortex",
+            "short_name": "Temporal Cortex",
+            "hemisphere": "Bilateral",
+            "mask": (((nx < 0.20) | (nx > 0.80)) & (ny >= 0.30) & (ny <= 0.72)),
+            "clinical": "Cortical thinning associated with psychiatric and affective changes in HD.",
+        },
+        {
+            "id": "parieto_occipital",
+            "name": "Parieto-Occipital Cortex",
+            "short_name": "Occipital Cortex",
+            "hemisphere": "Bilateral",
+            "mask": ((ny > 0.68) & (nx >= 0.25) & (nx <= 0.75)),
+            "clinical": "Secondary posterior cortical changes affecting visuospatial integration in advancing stages.",
+        },
+    ]
+
+    peak_val = float(np.max(heatmap_2d)) if heatmap_2d.size > 0 else 0.0
+    peak_idx = np.unravel_index(np.argmax(heatmap_2d), heatmap_2d.shape) if heatmap_2d.size > 0 else (0, 0)
+    peak_y, peak_x = int(peak_idx[0]), int(peak_idx[1])
+
+    scored_regions = []
+    for r in regions_def:
+        m = r["mask"]
+        if np.any(m):
+            sub = heatmap_2d[m]
+            max_act = float(np.max(sub))
+            mean_act = float(np.mean(sub))
+            score = 0.65 * max_act + 0.35 * mean_act
+        else:
+            max_act, mean_act, score = 0.0, 0.0, 0.0
+
+        pct = int(round(score * 100))
+        severity = "Critical" if pct >= 75 else ("Moderate" if pct >= 45 else ("Mild" if pct >= 20 else "Baseline"))
+        scored_regions.append({
+            "id": r["id"],
+            "name": r["name"],
+            "short_name": r["short_name"],
+            "hemisphere": r["hemisphere"],
+            "score": round(score, 4),
+            "max_activation": round(max_act, 4),
+            "percentage": pct,
+            "severity": severity,
+            "clinical": r["clinical"],
+        })
+
+    scored_regions.sort(key=lambda x: x["score"], reverse=True)
+    primary = scored_regions[0] if scored_regions else {
+        "name": "Striatum / Caudate Nucleus",
+        "short_name": "Striatum",
+        "hemisphere": "Bilateral",
+        "score": 0.5,
+        "percentage": 50,
+        "severity": "Moderate",
+        "clinical": "Primary site of medium spiny neuron loss in Huntington's Disease.",
+    }
+
+    secondary = [r["name"] for r in scored_regions[1:4] if r["percentage"] >= 30]
+
+    color_meanings = [
+        {
+            "color": "Red",
+            "tag": "RED (80-100%)",
+            "hex": "#ff4444",
+            "level": "Critical Attention",
+            "meaning": "Severe localized atrophy driving stage prediction.",
+        },
+        {
+            "color": "Yellow",
+            "tag": "YELLOW (50-80%)",
+            "hex": "#ffcc00",
+            "level": "Moderate Activation",
+            "meaning": "Intermediate neurodegeneration / tissue stress.",
+        },
+        {
+            "color": "Blue",
+            "tag": "BLUE (5-50%)",
+            "hex": "#3388ff",
+            "level": "Preserved Baseline",
+            "meaning": "Low/normal involvement without major atrophy.",
+        },
+        {
+            "color": "Grayscale",
+            "tag": "GRAYSCALE",
+            "hex": "#aaaaaa",
+            "level": "Structural MRI",
+            "meaning": "T1-weighted brain anatomy (Parenchyma, CSF ventricles & sulci).",
+        },
+    ]
+
+    return {
+        "primary_region": primary["name"],
+        "short_name": primary.get("short_name", primary["name"]),
+        "primary_clinical_role": primary["clinical"],
+        "primary_score": primary["score"],
+        "primary_percentage": primary["percentage"],
+        "primary_severity": primary["severity"],
+        "peak_coordinates": [peak_x, peak_y],
+        "normalized_peak": [round(peak_x / float(max(w, 1)), 4), round(peak_y / float(max(h, 1)), 4)],
+        "detected_regions": scored_regions[:5],
+        "secondary_summary": ", ".join(secondary) if secondary else "None (Focal)",
+        "color_meanings": color_meanings,
+    }
+
+
 def save_2d_heatmap_overlay(
     image: Any,
     heatmap: np.ndarray,
@@ -708,8 +907,9 @@ def save_2d_heatmap_overlay(
     colormap: str = "jet",
     title: str = "GradCAM++ Brain Heatmap",
     dpi: int = 150,
+    region_analysis: dict[str, Any] | None = None,
 ) -> Path:
-    """Save a 2D MRI slice with GradCAM++ heatmap overlay to a file.
+    """Save a 2D MRI slice with GradCAM++ heatmap overlay, color legend, and brain region labels.
 
     Args:
         image: PIL Image or 2D numpy array [H, W].
@@ -719,6 +919,7 @@ def save_2d_heatmap_overlay(
         colormap: Matplotlib colormap name.
         title: Image title.
         dpi: Resolution.
+        region_analysis: Optional precomputed brain region analysis dict.
 
     Returns:
         Path to saved PNG.
@@ -726,21 +927,161 @@ def save_2d_heatmap_overlay(
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    fig, ax = plt.subplots(figsize=(6, 6), facecolor=BACKGROUND_COLOR)
-    ax.imshow(image, cmap=MRI_COLORMAP)
+    from PIL import Image
 
-    heat_masked = np.ma.masked_where(heatmap < 0.05, heatmap)
-    ax.imshow(
-        heat_masked,
-        cmap=colormap,
-        alpha=alpha,
-        vmin=0.0,
-        vmax=1.0,
-        aspect="equal",
+    if isinstance(image, Image.Image):
+        img_arr = np.array(image.convert("L"))
+    elif isinstance(image, np.ndarray):
+        img_arr = image if image.ndim == 2 else image[:, :, 0]
+    else:
+        img_arr = np.array(image)
+
+    h_img, w_img = img_arr.shape[:2]
+
+    # Resize heatmap if dimensions differ from MRI
+    if heatmap.shape[:2] != (h_img, w_img):
+        from scipy.ndimage import zoom
+        heatmap_resized = zoom(
+            heatmap,
+            (h_img / float(max(heatmap.shape[0], 1)), w_img / float(max(heatmap.shape[1], 1))),
+            order=1,
+        )
+        heatmap_resized = np.clip(heatmap_resized, 0.0, 1.0)
+    else:
+        heatmap_resized = heatmap
+
+    # Perform or use region analysis
+    analysis = region_analysis or analyze_brain_regions(heatmap_resized)
+    primary_name = analysis.get("primary_region", "Striatum (Caudate / Putamen)")
+    primary_role = analysis.get("primary_clinical_role", "Primary site of neurodegeneration in HD.")
+    primary_score = analysis.get("primary_score", 0.8)
+    peak_x, peak_y = analysis.get("peak_coordinates", [w_img // 2, h_img // 2])
+    peak_pct = analysis.get("primary_percentage", int(primary_score * 100))
+
+    # Clamp peak coordinates inside image
+    peak_x = max(2, min(w_img - 3, peak_x))
+    peak_y = max(2, min(h_img - 3, peak_y))
+
+    # Create publication figure with colorbar and informational legend
+    fig = plt.figure(figsize=(9, 10.4), facecolor=BACKGROUND_COLOR)
+    gs = fig.add_gridspec(2, 2, width_ratios=[1, 0.045], height_ratios=[1, 0.24], wspace=0.04, hspace=0.08)
+
+    ax_main = fig.add_subplot(gs[0, 0])
+    ax_cbar = fig.add_subplot(gs[0, 1])
+    ax_footer = fig.add_subplot(gs[1, :])
+
+    # Display MRI and overlay
+    ax_main.imshow(img_arr, cmap=MRI_COLORMAP)
+    heat_masked = np.ma.masked_where(heatmap_resized < 0.05, heatmap_resized)
+    im = ax_main.imshow(heat_masked, cmap=colormap, alpha=alpha, vmin=0.0, vmax=1.0)
+    ax_main.axis("off")
+    ax_main.set_facecolor(BACKGROUND_COLOR)
+
+    # Highlight hotspot reticle
+    reticle_r = max(h_img, w_img) * 0.035
+    circle = patches.Circle(
+        (peak_x, peak_y),
+        radius=reticle_r,
+        linewidth=2,
+        edgecolor="#ffffff",
+        facecolor="none",
+        linestyle="--",
     )
-    ax.set_title(title, color=TEXT_COLOR, fontsize=12, fontweight="bold", pad=12)
-    ax.axis("off")
-    ax.set_facecolor(BACKGROUND_COLOR)
+    ax_main.add_patch(circle)
+    ax_main.plot(peak_x, peak_y, "+", color="#ffffff", markersize=10, markeredgewidth=2)
+
+    # Callout annotation arrow
+    callout_x = peak_x + (w_img * 0.16 if peak_x < w_img * 0.6 else -w_img * 0.28)
+    callout_y = peak_y - h_img * 0.12 if peak_y > h_img * 0.25 else peak_y + h_img * 0.14
+    rad_dir = -0.2 if peak_x < w_img * 0.6 else 0.2
+
+    ax_main.annotate(
+        f"{primary_name}\n(Peak: {peak_pct}%)",
+        xy=(peak_x, peak_y),
+        xytext=(callout_x, callout_y),
+        color="#ffffff",
+        fontsize=9,
+        fontweight="bold",
+        bbox=dict(boxstyle="round,pad=0.35", facecolor="#12151f", edgecolor="#00b4d8", alpha=0.92, lw=1.2),
+        arrowprops=dict(arrowstyle="->", connectionstyle=f"arc3,rad={rad_dir}", color="#00b4d8", lw=1.5),
+    )
+
+    ax_main.set_title(
+        f"{title}\nTargeted Anatomy: {primary_name}",
+        color=TEXT_COLOR,
+        fontsize=13,
+        fontweight="bold",
+        pad=10,
+    )
+
+    # Colorbar
+    cbar = fig.colorbar(im, cax=ax_cbar)
+    cbar.set_ticks([0.05, 0.25, 0.50, 0.75, 1.0])
+    cbar.set_ticklabels(
+        ["0% (Preserved)", "25% (Mild)", "50% (Moderate)", "75% (Elevated)", "100% (Critical)"],
+        color="#dddddd",
+        fontsize=8.5,
+    )
+    cbar.set_label("Neural Activation & Pathological Weight", color="#00b4d8", fontsize=9.5, fontweight="bold", labelpad=10)
+    ax_cbar.tick_params(colors="#dddddd", length=3)
+
+    # Footer Card explaining colors and brain anatomy
+    ax_footer.axis("off")
+    ax_footer.set_facecolor(BACKGROUND_COLOR)
+
+    footer_box = patches.FancyBboxPatch(
+        (0.005, 0.02),
+        0.99,
+        0.96,
+        boxstyle="round,pad=0.02",
+        facecolor="#12151f",
+        edgecolor="#232a3b",
+        linewidth=1.2,
+    )
+    ax_footer.add_patch(footer_box)
+
+    # Section 1: Color Representation
+    ax_footer.text(
+        0.025,
+        0.88,
+        "WHAT THE COLORS REPRESENT IN THIS HEATMAP:",
+        transform=ax_footer.transAxes,
+        color="#00b4d8",
+        fontsize=8.5,
+        fontweight="bold",
+    )
+
+    color_lines = [
+        ("● RED (80-100%):", "#ff4444", "Critical Neural Attention — Severe localized atrophy driving the stage prediction."),
+        ("● YELLOW (50-80%):", "#ffcc00", "Moderate Activation — Intermediate neurodegeneration / tissue stress."),
+        ("● BLUE (5-50%):", "#3388ff", "Baseline Preserved Tissue — Low/normal involvement without major atrophy."),
+        ("● GRAYSCALE:", "#aaaaaa", "Structural Brain Anatomy — T1-weighted MRI (Parenchyma, CSF ventricles & sulci)."),
+    ]
+
+    y_start = 0.72
+    for label, col, desc in color_lines:
+        ax_footer.text(0.025, y_start, label, transform=ax_footer.transAxes, color=col, fontsize=7.8, fontweight="bold")
+        ax_footer.text(0.210, y_start, desc, transform=ax_footer.transAxes, color="#dddddd", fontsize=7.8)
+        y_start -= 0.12
+
+    # Section 2: Part of the Brain Highlighted
+    ax_footer.text(
+        0.025,
+        0.20,
+        "PART OF THE BRAIN HIGHLIGHTED:",
+        transform=ax_footer.transAxes,
+        color="#00b4d8",
+        fontsize=8.5,
+        fontweight="bold",
+    )
+    ax_footer.text(
+        0.025,
+        0.07,
+        f"● Primary Target: {primary_name} ({primary_score*100:.0f}% Activation) — {primary_role}",
+        transform=ax_footer.transAxes,
+        color="#ffffff",
+        fontsize=7.8,
+    )
 
     fig.savefig(
         output_path,
@@ -750,6 +1091,6 @@ def save_2d_heatmap_overlay(
         edgecolor="none",
     )
     plt.close(fig)
-    logger.info("2D Heatmap overlay saved to %s", output_path)
+    logger.info("2D Heatmap overlay saved to %s (Target: %s)", output_path, primary_name)
     return output_path
 

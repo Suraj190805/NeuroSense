@@ -86,47 +86,13 @@ D. **NeuroSense Symptom Integration in AI Analysis**:
 
 ---
 
-### 2. CORE PHARMACOLOGY & MEDICATION KNOWLEDGE
-You possess expert mastery of the full Huntington's Disease medication formulary and clinical pharmacology:
-
-1. **Chorea & Motor Control (VMAT2 Inhibitors)**:
-   - **Deutetrabenazine (Austedo, Austedo XR)**: Reversible VMAT2 inhibitor. Starting: 6 mg PO daily with morning meal. Titrate weekly by 6 mg/day; maintenance: 12–48 mg/day divided BID with food. Max 36 mg/day in CYP2D6 poor metabolizers or with strong CYP2D6 inhibitors. Deuteration creates smoother PK, fewer peak-trough spikes, and lower somnolence vs tetrabenazine. *Warning:* Boxed warning for depression/suicidality in HD. *Administration:* XR tablets MUST NOT be crushed.
-   - **Tetrabenazine (Xenazine)**: Reversible VMAT2 inhibitor. Starting: 12.5 mg PO daily. Titrate weekly by 12.5 mg; maintenance: 25–75 mg/day divided TID (max 50 mg poor / 100 mg extensive metabolizers). Rapid chorea suppression. *Warning:* Boxed warning for depression, suicidality, akathisia, parkinsonism, somnolence. Immediate-release can be crushed.
-   - **Valbenazine (Ingrezza)**: Once-daily VMAT2 inhibitor (40–80 mg/day).
-
-2. **Antipsychotics / Severe Chorea & Psychosis (D2 Antagonists)**:
-   - **Olanzapine (Zyprexa / Zydis ODT)**: Atypical antipsychotic (D2/5-HT2A antagonist). Dosing: 2.5–15 mg PO daily (AM/Bedtime). Dual action: refractory chorea + severe psychosis/aggression + appetite/weight stimulation. *Dysphagia:* **Zydis ODT** dissolves instantly on tongue, ideal for advanced swallowing impairment.
-   - **Quetiapine (Seroquel)**: Dosing: 25–150 mg PO at bedtime. Fast D2 dissociation with lowest EPS risk. First-line for nocturnal agitation, sundowning, hallucinations, and sleep initiation.
-   - **Haloperidol / Risperidone / Aripiprazole**: Alternative dopamine antagonists for severe motor or behavioral crises when VMAT2 inhibitors are insufficient.
-
-3. **Rigidity, Spasticity & Myoclonus**:
-   - **Baclofen (Lioresal)**: GABAB agonist. Starting: 5 mg PO TID; titrate by 5 mg every 3 days; maintenance: 30–60 mg/day divided TID. Relieves painful rigidity, limb contractures, and dystonia (Westphal variant HD). *Critical:* NEVER discontinue abruptly (risk of rebound spasticity, hallucinations, seizures). Available in liquid and crushable tablets.
-   - **Clonazepam (Klonopin / Rivotril)**: High-potency benzodiazepine (GABA-A PAM). Dosing: 0.5–2.0 mg/day divided BID. Indicated for myoclonic twitches, acute panic surges, and choreic bursts. Available in ODT. Monitor sedation/secretions.
-   - **Amantadine**: NMDA antagonist / dopamine modulator for chorea and motor fluctuations.
-
-4. **Mood, Depression & Irritability**:
-   - **Sertraline (Zoloft)**: SSRI. Starting: 25–50 mg PO QAM; maintenance: 50–150 mg/day (max 200 mg). First-line for HD depression, irritability, emotional blunting, and obsessive-perseverative loops. Liquid concentrate available.
-   - **Citalopram / Escitalopram / Venlafaxine**: Alternative SSRIs/SNRIs for affective stabilization.
-
-5. **Sleep Disturbances**:
-   - **Trazodone (Desyrel)**: SARI (5-HT2A antagonist + H1 blockade). Dosing: 25–100 mg PO at bedtime. Promotes slow-wave sleep maintenance without aggravating chorea.
-   - **Melatonin**: 3–5 mg PO at bedtime. Resynchronizes suprachiasmatic circadian rhythm in pre-manifest and early HD.
-
-6. **Pre-manifest Neuroprotection & Bioenergetics**:
-   - **Coenzyme Q10 (Ubiquinone/Idebenone)**: 300–600 mg PO daily with dietary fats. Mitochondrial ETC cofactor buffering striatal bioenergetic decline.
-   - **Creatine Monohydrate**: 5–10 g PO daily with ≥2L water. Phosphocreatine ATP buffer against excitotoxicity.
-   - **High-EPA Omega-3 (Ethyl-EPA/Vascepa)**: 1,000–2,000 mg PO daily. Anti-neuroinflammatory membrane stabilization.
-
-7. **Emerging Disease-Modifying Therapies & Trials**:
-   - **Tominersen**: Huntingtin pre-mRNA lowering ASO (GENERATION-HD trials).
-   - **WVE-003**: Allele-selective ASO targeting mutant HTT SNP.
-   - **AMT-130**: AAV5 microRNA gene therapy via stereotactic intrastriatal delivery.
-   - **Pridopidine (PROOF-HD)**: Sigma-1 receptor agonist for TFC preservation.
-   - **SAGE-718**: Positive allosteric NMDA modulator for HD cognitive decline.
-
-8. **Dysphagia & Swallowing Safety**:
-   - Safe / Dissolvable: Olanzapine Zydis ODT, Clonazepam ODT, Sertraline concentrate, Baclofen liquid, CoQ10 wafers.
-   - CANNOT BE CRUSHED: Deutetrabenazine XR (Austedo XR).
+### 2. PATIENT REPORT INTERPRETATION & CLINICAL ASSESSMENT
+You possess expert mastery in translating complex neurological diagnostics into clear, compassionate, and actionable explanations for patients and families:
+- **CAG Repeat Count (Genetics)**: Normal (<27), Mutable/Intermediate (27-35), Reduced penetrance (36-39), Full penetrance (40+). Explain clearly how CAG repeats relate to mutant huntingtin production and statistical age-of-onset distributions, while emphasizing that lifestyle, neuroplasticity, and clinical care influence individual well-being.
+- **Multimodal AI Staging**: Explain the stages (`Normal / Pre-manifest`, `Early Stage HD`, `Moderate Stage HD`, `Advanced HD`) based on the UHDRS Total Functional Capacity (TFC), motor scores, and MRI volumetrics.
+- **Cognitive & Motor Performance Tests**: Explain what finger tapping, reaction time, Stroop-like tests, and memory recall measure (striatal-frontal coordination, processing speed, working memory) and how tracking these over time helps monitor disease progression.
+- **12-Month & 24-Month Forecasts**: Explain probabilistic progression forecasts responsibly, framing them as guidance for clinical monitoring and proactive supportive therapies.
+- **Physician Partnership**: Empower patients with structured, relevant questions to bring to their attending neurologist. Remind patients that this AI tool does not prescribe or alter medications, and all pharmacotherapy decisions must be made directly with their attending neurologist.
 
 ---
 
@@ -134,11 +100,11 @@ You possess expert mastery of the full Huntington's Disease medication formulary
 1. **Be Crisp, Reasonable & Concise**: Keep responses to **2 to 4 focused paragraphs or compact bullet points** (~100 to 220 words total). Never write runaway essays or repetitive walls of text unless the user specifically demands an exhaustive multi-page report.
 2. **Zero Generic Fluff**: NEVER start with robotic boilerplate (e.g., *"As an AI assistant specialised in..."* or *"Huntington's Disease is an inherited genetic disorder caused by CAG repeats..."* unless specifically asked for definition). Answer the prompt immediately and directly.
 3. **No Repetitive Answers for Similar Questions**:
-   - Always address the exact angle and nuance of the question (symptoms vs. dosing vs. comparison vs. safety vs. practical administration vs. platform scoring).
+   - Always address the exact angle and nuance of the question (symptoms vs. scores vs. comparison vs. safety vs. practical daily habits vs. platform staging).
    - If the user re-asks or follows up on a topic, provide fresh insights, comparative advantages, practical clinical tips, or caregiver guidance rather than repeating earlier text.
    - Vary your phrasing, structure, and formatting dynamically.
-4. **Structured Curation**: Use bold lead-ins (e.g. **Symptoms:**, **Dosage:**, **Mechanism:**, **Administration:**, **Safety:**) and clean bullet points for instant scannability.
-5. **Compassionate & Clinically Accurate**: Maintain warmth, clinical precision, and close with a brief educational disclaimer (e.g., `*Educational only — always consult the treating neurologist.*`)."""
+4. **Structured Curation**: Use bold lead-ins (e.g. **Findings:**, **Interpretation:**, **Daily Impact:**, **Next Steps for Doctor:**) and clean bullet points for instant scannability.
+5. **Compassionate & Clinically Accurate**: Maintain warmth, clinical precision, and close with a brief educational disclaimer (e.g., `*Educational only — always consult Dr. {doctor_name} or your treating neurologist.*`)."""
 
 
 # ─── Request / Response Models ───
@@ -150,7 +116,7 @@ class ChatMessage(BaseModel):
 
 
 class ChatRequest(BaseModel):
-    """Chat request with conversation history."""
+    """Chat request with conversation history and optional clinical report context."""
     message: str = Field(..., min_length=1, max_length=4000, description="User message")
     history: list[ChatMessage] = Field(
         default_factory=list,
@@ -159,6 +125,14 @@ class ChatRequest(BaseModel):
     session_id: str = Field(
         default="",
         description="Conversation session ID for persistence (auto-generated if empty)",
+    )
+    report_context: dict[str, Any] | None = Field(
+        default=None,
+        description="Optional active clinical report data for patient consultation",
+    )
+    patient_id: str | None = Field(
+        default=None,
+        description="Optional patient identifier for conversation tracking",
     )
 
 
@@ -179,17 +153,76 @@ async def chat(request: ChatRequest) -> ChatResponse:
     """Send a message to the NeuroSense AI assistant.
 
     The assistant is specialised in Huntington's Disease and can
-    answer questions about HD genetics, symptoms, diagnosis,
-    treatment, the NeuroSense platform, and caregiving.
+    read patient clinical reports, explain staging and test scores,
+    and answer questions about symptoms, genetics, and neurology follow-ups.
 
     Args:
-        request: Chat request with user message and optional history.
+        request: Chat request with user message, optional history, and optional report context.
 
     Returns:
         ChatResponse with the AI-generated reply.
     """
-    # Build messages array with system prompt + history + new message
+    # Build messages array with system prompt + report context (if present) + history + new message
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+
+    # If clinical report context is provided, ground the LLM in the patient's specific results
+    if request.report_context:
+        ctx = request.report_context
+        patient_name = ctx.get("patient_name") or ctx.get("patientName") or "Patient"
+        doctor_name = ctx.get("doctor_name") or ctx.get("doctorName") or "Neurologist"
+        doctor_email = ctx.get("doctor_email") or ctx.get("doctorEmail") or ""
+        stage_label = ctx.get("stage_label") or ctx.get("stage") or ctx.get("prediction") or "Under Assessment"
+        conf = ctx.get("confidence")
+        conf_str = f"{float(conf) * 100:.1f}%" if conf is not None else "N/A"
+        cag = ctx.get("cag_repeat") or ctx.get("cagRepeat") or "Not recorded"
+        age = ctx.get("age") or "Not recorded"
+        motor = ctx.get("motor_score") or ctx.get("motorScore")
+        motor_str = f"{motor}%" if motor is not None else "Not recorded"
+        memory = ctx.get("memory_score") or ctx.get("memoryScore")
+        memory_str = f"{memory}%" if memory is not None else "Not recorded"
+        func = ctx.get("functional_score") or ctx.get("functionalScore")
+        func_str = f"{func}%" if func is not None else "Not recorded"
+        prog12 = ctx.get("progression_12m") or ctx.get("progression_12mo")
+        prog12_str = f"{float(prog12) * 100:.1f}%" if prog12 is not None else "N/A"
+        prog24 = ctx.get("progression_24m") or ctx.get("progression_24mo")
+        prog24_str = f"{float(prog24) * 100:.1f}%" if prog24 is not None else "N/A"
+        symptoms = ctx.get("symptoms") or []
+        symptoms_str = ", ".join(symptoms) if isinstance(symptoms, list) and symptoms else (str(symptoms) if symptoms else "None reported")
+        date_str = ctx.get("date") or "Recent"
+
+        shap_summary = ""
+        if ctx.get("shap_values") and isinstance(ctx["shap_values"], dict):
+            shap_items = [
+                f"{k}: {v:+.3f}" if isinstance(v, (int, float)) else f"{k}: {v}"
+                for k, v in list(ctx["shap_values"].items())[:5]
+            ]
+            shap_summary = ", ".join(shap_items)
+
+        report_sys_msg = f"""### ACTIVE PATIENT CLINICAL REPORT CONTEXT
+You are consulting with patient **{patient_name}** regarding their official NeuroSense clinical assessment report.
+Report Details:
+- **Patient**: {patient_name}
+- **Attending Neurologist**: Dr. {doctor_name} {f'({doctor_email})' if doctor_email else ''}
+- **Assessment Date**: {date_str}
+- **Predicted HD Stage**: {stage_label}
+- **Diagnostic Confidence**: {conf_str}
+- **Age at Assessment**: {age}
+- **CAG Repeat Count**: {cag}
+- **Motor Performance Score**: {motor_str}
+- **Memory & Cognitive Score**: {memory_str}
+- **Daily Functional Capacity**: {func_str}
+- **12-Month Progression Risk**: {prog12_str}
+- **24-Month Progression Risk**: {prog24_str}
+- **Reported Clinical Symptoms**: {symptoms_str}
+{f"- **Key Contributing Biomarkers (SHAP)**: {shap_summary}" if shap_summary else ""}
+
+CONSULTATION DIRECTIVES:
+1. Ground your response directly in these actual numbers and findings. When the patient asks what their stage, CAG count, or test score means, reference their specific values ({stage_label}, CAG: {cag}, Motor: {motor_str}, Memory: {memory_str}).
+2. Explain neurological terms in clear, empathetic, accessible language without patronizing or alarming the patient.
+3. Offer reassuring, practical advice on daily habits, cognitive engagement, physical therapy, and fall prevention.
+4. Prepare 2-3 specific, tailored questions they can discuss with Dr. {doctor_name} at their next follow-up.
+5. Do NOT prescribe, dose, or adjust medications. Advise discussing any medical management directly with Dr. {doctor_name}."""
+        messages.append({"role": "system", "content": report_sys_msg})
 
     # Add conversation history (last 12 messages for concise context)
     for msg in request.history[-12:]:
@@ -243,12 +276,14 @@ async def chat(request: ChatRequest) -> ChatResponse:
 
                 if is_connected():
                     try:
+                        patient_id = request.patient_id or (request.report_context.get("patient_id") if request.report_context else None)
                         await save_chat_message(
                             session_id=session_id,
                             user_message=request.message,
                             assistant_reply=reply,
+                            patient_id=patient_id,
                         )
-                        logger.info("Saved chat exchange to MongoDB for session=%s", session_id)
+                        logger.info("Saved chat exchange to MongoDB for session=%s (patient_id=%s)", session_id, patient_id)
                     except Exception as db_err:
                         logger.warning("Failed to save chat to DB: %s", db_err)
 

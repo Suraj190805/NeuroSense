@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, createContext, useContext, Fragment } from 'react';
 import { Routes, Route, Link, useNavigate, useLocation } from 'react-router-dom';
 import { LanguageProvider, useLanguage, LANGUAGES } from './LanguageContext';
+import { ToastProvider, useToast } from './ToastContext';
 import BrainViewer3D from './BrainViewer3D';
 import './App.css';
 
@@ -23,433 +24,6 @@ const FEATURE_LABELS = {
   age: 'Age',
   symptoms: 'Clinical Symptoms',
 };
-
-/* ═══════════════════════════════════════════
-   CLINICAL MEDICATIONS & PHARMACOLOGY DATA
-   ═══════════════════════════════════════════ */
-
-const MEDICATIONS_DATA = [
-  // ─── Normal / Pre-manifest Stage ───
-  {
-    id: 'coq10',
-    name: 'Coenzyme Q10 (Ubiquinone / Idebenone)',
-    genericName: 'Coenzyme Q10',
-    brandName: 'CoQ10 / Idebenone',
-    stage: 'pre_manifest',
-    stageLabel: 'Normal / Pre-manifest',
-    category: 'neuroprotection',
-    categoryLabel: 'Neuroprotection',
-    icon: '⚡',
-    standardDose: '300 mg – 600 mg PO daily',
-    startingDose: '300 mg PO once daily with morning meal',
-    titration: 'Increase to 600 mg daily after 4 weeks based on GI tolerance; divide BID (300 mg AM / 300 mg PM) if >300 mg.',
-    timings: [
-      { time: '8:00 AM', slot: 'Morning', dose: '300 mg', instruction: 'Take with breakfast (fat-containing meal for absorption)' },
-    ],
-    timingSummary: '🌅 Morning (8:00 AM) with breakfast',
-    administration: 'Oral softgel/capsule. Take with dietary fats (e.g., avocado, eggs, nuts) to maximize bioavailability.',
-    mechanism: 'Mitochondrial electron transport chain cofactor; scavenges reactive oxygen species (ROS) and buffers striatal bioenergetic decline.',
-    primaryObjective: 'Mitochondrial antioxidant support and slowing metabolic neuronal decay in pre-symptomatic gene carriers.',
-    sideEffects: ['Mild gastrointestinal upset', 'Nausea', 'Transient insomnia (if taken late)'],
-    contraindications: ['Hypersensitivity to CoQ10', 'Concurrent high-dose warfarin (monitor INR)'],
-    dysphagiaSafe: true,
-    dysphagiaNotes: 'Available in chewable wafers or liquid oral suspension.',
-  },
-  {
-    id: 'creatine',
-    name: 'Creatine Monohydrate',
-    genericName: 'Creatine Monohydrate',
-    brandName: 'Micronized Creatine',
-    stage: 'pre_manifest',
-    stageLabel: 'Normal / Pre-manifest',
-    category: 'neuroprotection',
-    categoryLabel: 'Neuroprotection',
-    icon: '🧬',
-    standardDose: '5 g – 10 g PO daily',
-    startingDose: '5 g PO once daily dissolved in 250ml water',
-    titration: 'No aggressive loading phase needed in HD; maintain continuous 5g/day or titrate to 10g/day (divided 5g BID) after 2 months.',
-    timings: [
-      { time: '8:00 AM', slot: 'Morning', dose: '5 g', instruction: 'Dissolve powder in water or juice; take with morning routine' },
-    ],
-    timingSummary: '🌅 Morning (8:00 AM) with plenty of hydration',
-    administration: 'Oral powder. Dissolve thoroughly in room-temperature fluid. Ensure minimum 2L daily water intake.',
-    mechanism: 'Phosphocreatine energy buffer maintaining intracellular ATP homeostasis and protecting medium spiny neurons against excitotoxicity.',
-    primaryObjective: 'Preserving striatal bioenergetic reserves and muscular energy metabolism.',
-    sideEffects: ['Mild water retention', 'Stomach cramps if under-hydrated', 'Transient elevation in serum creatinine (non-toxic)'],
-    contraindications: ['Pre-existing severe renal insufficiency (eGFR < 30 mL/min)'],
-    dysphagiaSafe: true,
-    dysphagiaNotes: 'Completely soluble powder; easily mixes into thickened liquids, smoothies, or soft purees.',
-  },
-  {
-    id: 'melatonin-pre',
-    name: 'Melatonin (Circadian Synchronizer)',
-    genericName: 'Melatonin',
-    brandName: 'Melatonin / Circadin',
-    stage: 'pre_manifest',
-    stageLabel: 'Normal / Pre-manifest',
-    category: 'sleep',
-    categoryLabel: 'Sleep Support',
-    icon: '🌙',
-    standardDose: '3 mg – 5 mg PO at bedtime',
-    startingDose: '3 mg PO 30–60 minutes prior to planned sleep',
-    titration: 'Titrate to 5 mg if sleep fragmentation persists. Use sustained-release formulation for middle-of-the-night awakenings.',
-    timings: [
-      { time: '9:30 PM', slot: 'Bedtime', dose: '3 mg', instruction: 'Take 30–45 min before sleep; minimize screen exposure' },
-    ],
-    timingSummary: '🌙 Bedtime (9:30 PM) 30 min before sleep',
-    administration: 'Oral tablet. Swallow with water; maintain consistent darkness and bedtime routine.',
-    mechanism: 'MT1/MT2 receptor agonist restoring suprachiasmatic nucleus circadian rhythms and offering free-radical neuroprotection.',
-    primaryObjective: 'Early stabilization of circadian rhythm disturbances characteristic of preclinical Huntington\'s Disease.',
-    sideEffects: ['Morning grogginess', 'Vivid dreams', 'Mild headache'],
-    contraindications: ['Autoimmune disorders (relative)', 'Concurrent heavy sedative use without monitoring'],
-    dysphagiaSafe: true,
-    dysphagiaNotes: 'Available in fast-dissolving sublingual drops or oral liquid.',
-  },
-  {
-    id: 'omega3',
-    name: 'High-EPA Omega-3 Fatty Acids (Ethyl-EPA)',
-    genericName: 'Eicosapentaenoic Acid / DHA',
-    brandName: 'Vascepa / Pure EPA',
-    stage: 'pre_manifest',
-    stageLabel: 'Normal / Pre-manifest',
-    category: 'neuroprotection',
-    categoryLabel: 'Neuroprotection',
-    icon: '🌿',
-    standardDose: '1,000 mg – 2,000 mg PO daily',
-    startingDose: '1,000 mg PO daily with dinner',
-    titration: 'Increase to 2,000 mg/day after 2 weeks if tolerated well.',
-    timings: [
-      { time: '7:00 PM', slot: 'Evening', dose: '1,000 mg', instruction: 'Take with dinner' },
-    ],
-    timingSummary: '🌆 Evening (7:00 PM) with dinner',
-    administration: 'Oral capsules. Ingest whole with food.',
-    mechanism: 'Modulates membrane lipid bilayer fluidity, suppresses neuroinflammatory cytokine cascades, and supports cerebral perfusion.',
-    primaryObjective: 'Neurovascular membrane stabilization and neuroinflammatory attenuation.',
-    sideEffects: ['Fishy aftertaste', 'Mild dyspepsia', 'Minor anti-platelet effect at high doses'],
-    contraindications: ['Fish/shellfish severe allergy', 'Active bleeding diathesis'],
-    dysphagiaSafe: true,
-    dysphagiaNotes: 'Liquid emulsion or softgel puncture onto food.',
-  },
-
-  // ─── Early HD Stage ───
-  {
-    id: 'deutetrabenazine',
-    name: 'Deutetrabenazine (Austedo)',
-    genericName: 'Deutetrabenazine',
-    brandName: 'Austedo / Austedo XR',
-    stage: 'early',
-    stageLabel: 'Early HD Stage',
-    category: 'chorea',
-    categoryLabel: 'Chorea / Motor Control',
-    icon: '⚡',
-    standardDose: '12 mg – 48 mg / day (Divided BID)',
-    startingDose: '6 mg PO once daily with morning meal (Week 1)',
-    titration: 'Titrate weekly by 6 mg/day increments (e.g. Wk 1: 6mg AM; Wk 2: 6mg BID; Wk 3: 9mg BID; up to max 48mg/day) based on chorea reduction and tolerability.',
-    timings: [
-      { time: '8:00 AM', slot: 'Morning', dose: '12 mg', instruction: 'Take with breakfast (with food)' },
-      { time: '7:30 PM', slot: 'Evening', dose: '12 mg', instruction: 'Take with evening meal' },
-    ],
-    timingSummary: '🌅 Morning (8:00 AM) & 🌆 Evening (7:30 PM) with meals',
-    administration: 'Administer with food. Swallow tablets whole; do not chew, crush, or divide extended-release tablets.',
-    mechanism: 'Reversible vesicular monoamine transporter 2 (VMAT2) inhibitor; deuteration attenuates CYP2D6 metabolism for smooth, prolonged dopamine depletion without sharp Cmax peaks.',
-    primaryObjective: 'First-line FDA-approved chorea suppression with reduced peak-to-trough fluctuations and lower somnolence risk.',
-    sideEffects: ['Somnolence / fatigue', 'Diarrhea', 'Dry mouth', 'Insomnia'],
-    contraindications: ['Boxed Warning: Suicidal ideation & untreated depression', 'Hepatic impairment', 'Concurrent MAOIs or reserpine', 'CYP2D6 poor metabolizers require lower max dose (36 mg/day)'],
-    dysphagiaSafe: false,
-    dysphagiaNotes: 'Cannot be crushed. For dysphagic patients, consider transitioning to Tetrabenazine liquid or neuroleptics.',
-  },
-  {
-    id: 'tetrabenazine',
-    name: 'Tetrabenazine (Xenazine)',
-    genericName: 'Tetrabenazine',
-    brandName: 'Xenazine',
-    stage: 'early',
-    stageLabel: 'Early HD Stage',
-    category: 'chorea',
-    categoryLabel: 'Chorea / Motor Control',
-    icon: '💊',
-    standardDose: '25 mg – 75 mg / day (Divided TID)',
-    startingDose: '12.5 mg PO once daily in morning (Week 1)',
-    titration: 'After 1 week, increase to 12.5 mg BID. Titrate by 12.5 mg weekly to TID dosing as needed; max 50 mg/day (CYP2D6 poor) or 100 mg/day (extensive).',
-    timings: [
-      { time: '8:00 AM', slot: 'Morning', dose: '25 mg', instruction: 'Take with breakfast' },
-      { time: '1:00 PM', slot: 'Midday', dose: '12.5 mg', instruction: 'Take with lunch' },
-      { time: '6:30 PM', slot: 'Evening', dose: '25 mg', instruction: 'Take with dinner' },
-    ],
-    timingSummary: '🌅 8:00 AM, ☀️ 1:00 PM, 🌆 6:30 PM with meals',
-    administration: 'Oral tablet. Can be taken with or without food. Maintain regular dosing intervals.',
-    mechanism: 'Potent reversible VMAT2 inhibitor causing presynaptic depletion of dopamine, serotonin, and norepinephrine.',
-    primaryObjective: 'Rapid and effective chorea suppression in moderate-to-severe involuntary movements.',
-    sideEffects: ['Sedation / somnolence', 'Depression / dysphoria', 'Parkinsonism / akathisia', 'Nausea'],
-    contraindications: ['Boxed Warning: Depression & Suicidality in HD', 'Concurrent MAOIs (within 14 days)', 'Severe hepatic impairment', 'QTc prolongation (>500 ms)'],
-    dysphagiaSafe: true,
-    dysphagiaNotes: 'Tablets may be crushed and mixed with soft food if immediate-release formulation is utilized.',
-  },
-  {
-    id: 'sertraline',
-    name: 'Sertraline (Zoloft)',
-    genericName: 'Sertraline Hydrochloride',
-    brandName: 'Zoloft',
-    stage: 'early',
-    stageLabel: 'Early HD Stage',
-    category: 'mood',
-    categoryLabel: 'Mood & Psychiatric',
-    icon: '🧠',
-    standardDose: '50 mg – 150 mg PO daily',
-    startingDose: '25 mg – 50 mg PO once daily in morning',
-    titration: 'Increase by 25–50 mg increments every 2–4 weeks based on clinical depression, irritability, and anxiety response (max 200 mg/day).',
-    timings: [
-      { time: '8:00 AM', slot: 'Morning', dose: '50 mg', instruction: 'Take with morning meal' },
-    ],
-    timingSummary: '🌅 Morning (8:00 AM) with breakfast',
-    administration: 'Oral tablet or oral solution. Take in morning to prevent nighttime insomnia.',
-    mechanism: 'Selective serotonin reuptake inhibitor (SSRI); elevates synaptic 5-HT availability in frontostriatal circuits.',
-    primaryObjective: 'First-line management of HD-associated depression, irritability, affective blunting, and obsessive behaviors.',
-    sideEffects: ['Nausea (initial 1-2 weeks)', 'Tremor', 'Sexual dysfunction', 'Initial agitation'],
-    contraindications: ['Concurrent MAOIs or Pimozide', 'Serotonin syndrome risk with other serotonergic agents'],
-    dysphagiaSafe: true,
-    dysphagiaNotes: 'Available as oral concentrate (20 mg/mL) which must be diluted in 4 oz of water, ginger ale, or orange juice.',
-  },
-  {
-    id: 'trazodone',
-    name: 'Trazodone (Desyrel)',
-    genericName: 'Trazodone Hydrochloride',
-    brandName: 'Desyrel / Oleptro',
-    stage: 'early',
-    stageLabel: 'Early HD Stage',
-    category: 'sleep',
-    categoryLabel: 'Sleep Support',
-    icon: '🌙',
-    standardDose: '50 mg – 100 mg PO at bedtime',
-    startingDose: '25 mg – 50 mg PO at bedtime',
-    titration: 'Increase to 100 mg at bedtime after 1 week if nocturnal chorea and sleep fragmentation persist.',
-    timings: [
-      { time: '9:30 PM', slot: 'Bedtime', dose: '50 mg', instruction: 'Take 30 min before bedtime with a small snack' },
-    ],
-    timingSummary: '🌙 Bedtime (9:30 PM) 30 min before sleep',
-    administration: 'Oral tablet. Take shortly after a light snack or with water before sleep.',
-    mechanism: 'Serotonin 5-HT2A antagonist and reuptake inhibitor (SARI) with H1-histaminergic blockade inducing restorative slow-wave sleep.',
-    primaryObjective: 'Treating sleep maintenance insomnia, nighttime agitation, and nocturnal motor unrest without worsening chorea.',
-    sideEffects: ['Orthostatic hypotension', 'Dry mouth', 'Morning grogginess', 'Rare priapism'],
-    contraindications: ['Concurrent MAOIs', 'Severe cardiac arrhythmias / recovery phase of MI'],
-    dysphagiaSafe: true,
-    dysphagiaNotes: 'Scored tablets can be cut in half or crushed with applesauce.',
-  },
-
-  // ─── Advanced HD Stage ───
-  {
-    id: 'olanzapine',
-    name: 'Olanzapine (Zyprexa / Zydis ODT)',
-    genericName: 'Olanzapine',
-    brandName: 'Zyprexa / Zydis ODT',
-    stage: 'advanced',
-    stageLabel: 'Advanced HD Stage',
-    category: 'chorea',
-    categoryLabel: 'Severe Chorea & Psychosis',
-    icon: '🚨',
-    standardDose: '5 mg – 15 mg PO daily (Divided or Bedtime)',
-    startingDose: '2.5 mg – 5 mg PO at bedtime',
-    titration: 'Titrate by 2.5 mg every 1–2 weeks based on severe choreic surges, psychosis, aggression, and appetite stimulation goals (max 20 mg/day).',
-    timings: [
-      { time: '8:00 AM', slot: 'Morning', dose: '2.5 mg', instruction: 'Take with morning meal' },
-      { time: '8:30 PM', slot: 'Bedtime', dose: '5 mg', instruction: 'Take with evening routine' },
-    ],
-    timingSummary: '🌅 Morning (2.5 mg) & 🌙 Bedtime (5 mg)',
-    administration: 'Oral tablet or orally disintegrating tablet (ODT). ODT melts immediately on tongue with saliva; no water required.',
-    mechanism: 'Atypical second-generation antipsychotic; potent D2, 5-HT2A, and 5-HT2C receptor antagonist.',
-    primaryObjective: 'Dual suppression of refractory chorea and severe neuropsychiatric symptoms (psychosis, severe agitation, weight loss/cachexia).',
-    sideEffects: ['Weight gain / metabolic shift', 'Sedation', 'Anticholinergic effects', 'Orthostasis'],
-    contraindications: ['Dementia-related psychosis black box warning', 'Severe neutropenia / agranulocytosis risk with clozapine (safe alternative)', 'Severe cardiac decompensation'],
-    dysphagiaSafe: true,
-    dysphagiaNotes: '⭐ Preferred Zydis ODT formulation: instantly dissolves on tongue, ideal for advanced stage dysphagia and aspiration prevention.',
-  },
-  {
-    id: 'baclofen',
-    name: 'Baclofen (Lioresal)',
-    genericName: 'Baclofen',
-    brandName: 'Lioresal',
-    stage: 'advanced',
-    stageLabel: 'Advanced HD Stage',
-    category: 'rigidity',
-    categoryLabel: 'Rigidity & Spasticity',
-    icon: '🩺',
-    standardDose: '30 mg – 60 mg / day (Divided TID)',
-    startingDose: '5 mg PO TID with meals',
-    titration: 'Titrate gradually every 3 days by 5 mg/dose (e.g. 10 mg TID -> 15 mg TID -> 20 mg TID) to relieve muscle stiffness and dystonia while preserving trunk stability.',
-    timings: [
-      { time: '8:00 AM', slot: 'Morning', dose: '10 mg', instruction: 'Take with breakfast' },
-      { time: '1:30 PM', slot: 'Midday', dose: '10 mg', instruction: 'Take with lunch' },
-      { time: '9:00 PM', slot: 'Bedtime', dose: '15 mg', instruction: 'Take at bedtime' },
-    ],
-    timingSummary: '🌅 8:00 AM, ☀️ 1:30 PM, 🌙 9:00 PM with meals',
-    administration: 'Oral tablet or oral solution. Must be taken consistently; NEVER discontinue abruptly due to risk of rebound spasticity, hallucinations, and seizures.',
-    mechanism: 'GABAB receptor agonist at spinal interneuron levels; hyperpolarizes afferent motor terminals suppressing mono- and polysynaptic reflex arcs.',
-    primaryObjective: 'Relieving painful limb dystonia, hypertonia, rigidity, and muscle contractures in advanced stage Westphal variant/late HD.',
-    sideEffects: ['Drowsiness / sedation', 'Muscle weakness (hypotonia)', 'Dizziness', 'Confusion'],
-    contraindications: ['Abrupt cessation warning', 'Severe renal impairment without dose adjustment'],
-    dysphagiaSafe: true,
-    dysphagiaNotes: 'Oral liquid solution (5 mg/5 mL) available; crushed tablets dissolve easily in thickened liquids or PEG feeding tubes.',
-  },
-  {
-    id: 'quetiapine',
-    name: 'Quetiapine (Seroquel)',
-    genericName: 'Quetiapine Fumarate',
-    brandName: 'Seroquel',
-    stage: 'advanced',
-    stageLabel: 'Advanced HD Stage',
-    category: 'mood',
-    categoryLabel: 'Mood & Night Agitation',
-    icon: '🌙',
-    standardDose: '25 mg – 150 mg PO at bedtime',
-    startingDose: '25 mg PO at bedtime',
-    titration: 'Increase by 25 mg every 3–5 days to control nocturnal delirium, paranoia, and sleep disruption (max 300 mg/day).',
-    timings: [
-      { time: '9:30 PM', slot: 'Bedtime', dose: '50 mg', instruction: 'Take 30–45 min before sleep' },
-    ],
-    timingSummary: '🌙 Bedtime (9:30 PM)',
-    administration: 'Oral tablet. Immediate-release formulation preferred for bedtime sedation and rapid nighttime calming.',
-    mechanism: 'D2 and 5-HT2A antagonist with fast dissociation from D2 receptors, minimizing extrapyramidal symptoms and worsening of parkinsonian features.',
-    primaryObjective: 'Managing severe nocturnal agitation, sundowning, hallucinations, and emotional lability with lowest EPS risk.',
-    sideEffects: ['Somnolence', 'Orthostatic hypotension', 'Dry mouth', 'Constipation'],
-    contraindications: ['Severe hepatic failure', 'Concurrent strong CYP3A4 inhibitors (dose adjust)'],
-    dysphagiaSafe: true,
-    dysphagiaNotes: 'Immediate-release tablets can be finely crushed and mixed with smooth applesauce or pudding.',
-  },
-  {
-    id: 'clonazepam',
-    name: 'Clonazepam (Klonopin)',
-    genericName: 'Clonazepam',
-    brandName: 'Klonopin / Rivotril',
-    stage: 'advanced',
-    stageLabel: 'Advanced HD Stage',
-    category: 'rigidity',
-    categoryLabel: 'Myoclonus & Severe Anxiety',
-    icon: '🌿',
-    standardDose: '0.5 mg – 2.0 mg / day (Divided BID-TID)',
-    startingDose: '0.25 mg – 0.5 mg PO at bedtime',
-    titration: 'Increase by 0.25 mg every 3 days. Divide BID (AM/Bedtime) to manage myoclonic jerks and acute panic surges.',
-    timings: [
-      { time: '8:30 AM', slot: 'Morning', dose: '0.5 mg', instruction: 'Take with morning routine' },
-      { time: '9:30 PM', slot: 'Bedtime', dose: '0.5 mg', instruction: 'Take at bedtime' },
-    ],
-    timingSummary: '🌅 Morning (0.5 mg) & 🌙 Bedtime (0.5 mg)',
-    administration: 'Oral tablet or orally disintegrating tablet (ODT). Swallow or allow to dissolve.',
-    mechanism: 'High-potency benzodiazepine allosterically enhancing GABA-A receptor conductance, producing potent anticonvulsant, anxiolytic, and anti-myoclonic effects.',
-    primaryObjective: 'Controlling myoclonic twitches, sudden choreic surges, extreme panic, and severe sleep disturbances.',
-    sideEffects: ['Sedation / ataxia', 'Excess salivation / secretions (monitor swallowing)', 'Physical dependence with prolonged use'],
-    contraindications: ['Severe respiratory depression', 'Acute narrow-angle glaucoma', 'Severe sleep apnea'],
-    dysphagiaSafe: true,
-    dysphagiaNotes: 'ODT formulation (wafer) dissolves in seconds on the tongue without fluid.',
-  },
-];
-
-/* ═══════════════════════════════════════════
-   PERSONALIZED AI PRESCRIPTION GENERATOR
-   ═══════════════════════════════════════════ */
-
-function generatePersonalizedPrescription(result, form) {
-  if (!result) return null;
-  const stage = result.stage || result.prediction || 'early';
-  const confidence = result.confidence != null ? Math.round(result.confidence * 100) : 85;
-  const risk = result.risk_category || 'medium';
-  const motorScore = form?.motor_score != null ? form.motor_score : 70;
-  const memoryScore = form?.memory_score != null ? form.memory_score : 75;
-  const age = form?.age || 45;
-
-  let primaryMeds = [];
-  let secondaryMeds = [];
-  let dailyTimeline = [];
-  let titrationPlan = [];
-  let stageTitle = '';
-  let stageColor = 'var(--stage-early)';
-  let clinicalNotes = '';
-
-  if (stage === 'pre_manifest' || stage === 'Pre-manifest HD') {
-    stageTitle = 'Normal / Pre-manifest (Gene Carrier / At-Risk)';
-    stageColor = 'var(--stage-pre)';
-    primaryMeds = [
-      { ...MEDICATIONS_DATA.find(m => m.id === 'coq10'), customDose: '300 mg PO daily', targetReason: 'Striatal mitochondrial bioenergetic preservation' },
-      { ...MEDICATIONS_DATA.find(m => m.id === 'creatine'), customDose: '5 g PO daily', targetReason: 'ATP buffer against excitotoxic neuronal stress' },
-    ];
-    secondaryMeds = [
-      { ...MEDICATIONS_DATA.find(m => m.id === 'melatonin-pre'), customDose: '3 mg PO at bedtime', targetReason: 'Circadian rhythm synchronization' },
-      { ...MEDICATIONS_DATA.find(m => m.id === 'omega3'), customDose: '1,000 mg PO daily', targetReason: 'Neurovascular membrane stabilization' },
-    ];
-    dailyTimeline = [
-      { time: '8:00 AM', slot: 'Morning', pills: [{ name: 'Coenzyme Q10 (300 mg)', instruction: 'With breakfast' }, { name: 'Creatine Monohydrate (5 g)', instruction: 'Dissolved in 250ml water' }] },
-      { time: '7:00 PM', slot: 'Evening', pills: [{ name: 'Omega-3 EPA/DHA (1,000 mg)', instruction: 'With dinner' }] },
-      { time: '9:30 PM', slot: 'Bedtime', pills: [{ name: 'Melatonin (3 mg)', instruction: '30 min before sleep' }] },
-    ];
-    titrationPlan = [
-      { phase: 'Month 1 (Initiation)', detail: 'Start CoQ10 300mg QAM + Creatine 5g/day. Establish baseline sleep hygiene.' },
-      { phase: 'Month 2–3 (Optimization)', detail: 'If tolerated with no GI upset, maintain CoQ10 300-600mg daily. Add Melatonin 3mg if circadian fragmentation detected.' },
-      { phase: 'Long-term Maintenance', detail: 'Annual motor & cognitive digital tracking; evaluation for active clinical trial enrollment (e.g. HTT-lowering therapeutics).' },
-    ];
-    clinicalNotes = `Patient is in the pre-symptomatic / pre-manifest phase (Confidence: ${confidence}%). Recommended protocol prioritizes mitochondrial protection, cellular bioenergetics, and lifestyle sleep stabilization without neuroleptic exposure.`;
-  } else if (stage === 'advanced' || stage === 'Advanced Huntington\'s') {
-    stageTitle = 'Advanced Huntington\'s Disease';
-    stageColor = 'var(--stage-advanced)';
-    primaryMeds = [
-      { ...MEDICATIONS_DATA.find(m => m.id === 'olanzapine'), customDose: '2.5 mg AM / 5 mg Bedtime (Zydis ODT)', targetReason: 'Severe chorea suppression & psychosis management with dysphagia-safe ODT' },
-      { ...MEDICATIONS_DATA.find(m => m.id === 'baclofen'), customDose: '10 mg PO TID (Oral Liquid / Crushed)', targetReason: 'Limb hypertonia, rigidity, and painful muscle contractures' },
-    ];
-    secondaryMeds = [
-      { ...MEDICATIONS_DATA.find(m => m.id === 'quetiapine'), customDose: '50 mg PO at bedtime', targetReason: 'Nocturnal agitation & sundowning reduction' },
-      { ...MEDICATIONS_DATA.find(m => m.id === 'clonazepam'), customDose: '0.5 mg PO BID (ODT)', targetReason: 'Myoclonic surges and acute panic stabilization' },
-    ];
-    dailyTimeline = [
-      { time: '8:00 AM', slot: 'Morning', pills: [{ name: 'Olanzapine Zydis ODT (2.5 mg)', instruction: 'Dissolve on tongue with morning meal' }, { name: 'Baclofen Liquid (10 mg)', instruction: 'With breakfast' }, { name: 'Clonazepam ODT (0.5 mg)', instruction: 'Oral wafer' }] },
-      { time: '1:30 PM', slot: 'Midday', pills: [{ name: 'Baclofen Liquid (10 mg)', instruction: 'With lunch' }] },
-      { time: '8:30 PM', slot: 'Evening / Dinner', pills: [{ name: 'Baclofen Liquid (10 mg)', instruction: 'With dinner' }] },
-      { time: '9:30 PM', slot: 'Bedtime', pills: [{ name: 'Olanzapine Zydis ODT (5 mg)', instruction: 'At bedtime' }, { name: 'Quetiapine (50 mg)', instruction: 'Crushed with puree' }] },
-    ];
-    titrationPlan = [
-      { phase: 'Week 1 (Initiation)', detail: 'Start Olanzapine ODT 2.5mg Bedtime + Baclofen 5mg TID. Assess swallow safety & aspiration precautions.' },
-      { phase: 'Week 2–3 (Dose Escalation)', detail: 'Increase Olanzapine to 2.5mg AM / 5mg Bedtime. Titrate Baclofen by 5mg increments to 10mg TID for rigidity control.' },
-      { phase: 'Maintenance & Palliative Care', detail: 'Monitor swallowing mechanics continuously; use thickened liquids or ODT wafers; evaluate PEG tube compatibility.' },
-    ];
-    clinicalNotes = `Advanced stage presentation (Motor Performance: ${motorScore}%, Progression Risk: ${risk.toUpperCase()}). High priority on aspiration safety, ODT dissolving formulations, rigidity relief, and caregiver-assisted daily scheduling.`;
-  } else {
-    // Early Stage HD (Default)
-    stageTitle = 'Early Huntington\'s Disease';
-    stageColor = 'var(--stage-early)';
-    primaryMeds = [
-      { ...MEDICATIONS_DATA.find(m => m.id === 'deutetrabenazine'), customDose: '12 mg PO BID with meals', targetReason: 'Targeted chorea suppression with reduced dopamine fluctuation peaks' },
-      { ...MEDICATIONS_DATA.find(m => m.id === 'sertraline'), customDose: '50 mg PO QAM with breakfast', targetReason: 'Depression, irritability, and executive affective stabilization' },
-    ];
-    secondaryMeds = [
-      { ...MEDICATIONS_DATA.find(m => m.id === 'trazodone'), customDose: '50 mg PO at bedtime', targetReason: 'Nocturnal motor rest and sleep maintenance' },
-      { ...MEDICATIONS_DATA.find(m => m.id === 'coq10'), customDose: '300 mg PO daily', targetReason: 'Adjunctive neuroprotection' },
-    ];
-    dailyTimeline = [
-      { time: '8:00 AM', slot: 'Morning', pills: [{ name: 'Deutetrabenazine (12 mg)', instruction: 'Take with breakfast' }, { name: 'Sertraline (50 mg)', instruction: 'Take with morning meal' }] },
-      { time: '7:30 PM', slot: 'Evening', pills: [{ name: 'Deutetrabenazine (12 mg)', instruction: 'Take with dinner' }] },
-      { time: '9:30 PM', slot: 'Bedtime', pills: [{ name: 'Trazodone (50 mg)', instruction: '30 min before sleep' }] },
-    ];
-    titrationPlan = [
-      { phase: 'Week 1 (Initiation)', detail: 'Deutetrabenazine 6mg PO daily with breakfast + Sertraline 25mg daily. Monitor mood and depression scores.' },
-      { phase: 'Week 2–3 (Titration)', detail: 'Increase Deutetrabenazine to 6mg BID, then 12mg BID as tolerated for chorea control. Sertraline up to 50mg daily.' },
-      { phase: 'Maintenance (Month 1+)', detail: 'Target maintenance at 24-36mg/day divided BID. Quarterly review of motor score and psychiatric symptoms.' },
-    ];
-    clinicalNotes = `Early HD presentation (Confidence: ${confidence}%, Motor Score: ${motorScore}%). Protocol targets involuntary chorea suppression with VMAT2 inhibition while supporting mood and cognitive resilience.`;
-  }
-
-  return {
-    stage,
-    stageTitle,
-    stageColor,
-    confidence,
-    risk,
-    motorScore,
-    memoryScore,
-    age,
-    primaryMeds,
-    secondaryMeds,
-    dailyTimeline,
-    titrationPlan,
-    clinicalNotes,
-  };
-}
 
 /* ═══════════════════════════════════════════
    FLOATING PARTICLES BACKGROUND
@@ -532,6 +106,20 @@ function useScrollReveal() {
     document.querySelectorAll('.reveal').forEach((el) => observer.observe(el));
     return () => observer.disconnect();
   });
+}
+
+/* ═══════════════════════════════════════════
+   PAGE META (Title + Description per page)
+   ═══════════════════════════════════════════ */
+
+function usePageMeta(title, description) {
+  useEffect(() => {
+    document.title = title;
+    const meta = document.querySelector('meta[name="description"]');
+    if (meta) {
+      meta.setAttribute('content', description);
+    }
+  }, [title, description]);
 }
 
 /* ═══════════════════════════════════════════
@@ -658,6 +246,8 @@ function Navbar() {
     return activeSection === sectionId;
   };
 
+  const { isPatient } = useAuth();
+
   const navLinks = [
     { id: 'about', label: t('nav.aboutHD'), section: true },
     { id: 'analysis', label: t('nav.analysis'), section: true },
@@ -697,22 +287,26 @@ function Navbar() {
                 </a>
               </li>
             ))}
-            <li>
-              <Link
-                to="/memory-test"
-                className={`navbar-link-page ${isMemoryTest ? 'active' : ''}`}
-              >
-                {t('nav.memoryTest')}
-              </Link>
-            </li>
-            <li>
-              <Link
-                to="/motor-test"
-                className={`navbar-link-page ${location.pathname === '/motor-test' ? 'active' : ''}`}
-              >
-                {t('nav.motorTest')}
-              </Link>
-            </li>
+            {!isPatient && (
+              <li>
+                <Link
+                  to="/memory-test"
+                  className={`navbar-link-page ${isMemoryTest ? 'active' : ''}`}
+                >
+                  {t('nav.memoryTest')}
+                </Link>
+              </li>
+            )}
+            {!isPatient && (
+              <li>
+                <Link
+                  to="/motor-test"
+                  className={`navbar-link-page ${location.pathname === '/motor-test' ? 'active' : ''}`}
+                >
+                  {t('nav.motorTest')}
+                </Link>
+              </li>
+            )}
             <li>
               <Link
                 to="/progression"
@@ -721,14 +315,7 @@ function Navbar() {
                 {t('nav.progression')}
               </Link>
             </li>
-            <li>
-              <Link
-                to="/medications"
-                className={`navbar-link-page ${location.pathname === '/medications' ? 'active' : ''}`}
-              >
-                {t('nav.medications')}
-              </Link>
-            </li>
+
             <li>
               <Link
                 to="/history"
@@ -737,6 +324,16 @@ function Navbar() {
                 {t('nav.history')}
               </Link>
             </li>
+            {isPatient && (
+              <li>
+                <Link
+                  to="/patient-dashboard"
+                  className={`navbar-link-page ${location.pathname === '/patient-dashboard' ? 'active' : ''}`}
+                >
+                  📋 My Dashboard
+                </Link>
+              </li>
+            )}
             <li>
               <div className={`lang-switcher ${langOpen ? 'open' : ''}`} ref={langRef}>
                 <button
@@ -784,10 +381,20 @@ function Navbar() {
                   </button>
                   <div className="navbar-user-dropdown">
                     <div className="navbar-user-info">
-                      <div className="navbar-user-info-name">{user.name}</div>
+                      <div className="navbar-user-info-name">
+                        {user.name}
+                        <span className={`navbar-role-badge ${user.role === 'patient' ? 'role-patient' : 'role-doctor'}`}>
+                          {user.role === 'patient' ? '🧑‍🦽 Patient' : '🩺 Doctor'}
+                        </span>
+                      </div>
                       <div className="navbar-user-info-email">{user.email}</div>
                     </div>
                     <div className="navbar-user-divider" />
+                    {isPatient && (
+                      <button className="navbar-user-option" onClick={() => { navigate('/patient-dashboard'); setUserMenuOpen(false); }}>
+                        📋 My Dashboard
+                      </button>
+                    )}
                     <button className="navbar-user-option" onClick={() => { navigate('/history'); setUserMenuOpen(false); }}>
                       📊 Analysis History
                     </button>
@@ -845,24 +452,28 @@ function Navbar() {
               </a>
             </li>
           ))}
-          <li>
-            <Link
-              to="/memory-test"
-              className={isMemoryTest ? 'active' : ''}
-              onClick={() => setMobileOpen(false)}
-            >
-              {t('nav.memoryTest')}
-            </Link>
-          </li>
-          <li>
-            <Link
-              to="/motor-test"
-              className={location.pathname === '/motor-test' ? 'active' : ''}
-              onClick={() => setMobileOpen(false)}
-            >
-              {t('nav.motorTest')}
-            </Link>
-          </li>
+          {!isPatient && (
+            <li>
+              <Link
+                to="/memory-test"
+                className={isMemoryTest ? 'active' : ''}
+                onClick={() => setMobileOpen(false)}
+              >
+                {t('nav.memoryTest')}
+              </Link>
+            </li>
+          )}
+          {!isPatient && (
+            <li>
+              <Link
+                to="/motor-test"
+                className={location.pathname === '/motor-test' ? 'active' : ''}
+                onClick={() => setMobileOpen(false)}
+              >
+                {t('nav.motorTest')}
+              </Link>
+            </li>
+          )}
           <li>
             <Link
               to="/progression"
@@ -872,15 +483,7 @@ function Navbar() {
               {t('nav.progression')}
             </Link>
           </li>
-          <li>
-            <Link
-              to="/medications"
-              className={location.pathname === '/medications' ? 'active' : ''}
-              onClick={() => setMobileOpen(false)}
-            >
-              {t('nav.medications')}
-            </Link>
-          </li>
+
           <li>
             <Link
               to="/history"
@@ -890,6 +493,17 @@ function Navbar() {
               {t('nav.history')}
             </Link>
           </li>
+          {isPatient && (
+            <li>
+              <Link
+                to="/patient-dashboard"
+                className={location.pathname === '/patient-dashboard' ? 'active' : ''}
+                onClick={() => setMobileOpen(false)}
+              >
+                📋 My Dashboard
+              </Link>
+            </li>
+          )}
         </ul>
 
         {/* Mobile language selector */}
@@ -909,6 +523,32 @@ function Navbar() {
           </div>
         </div>
 
+        {/* Mobile theme toggle */}
+        <div className="mobile-theme-section" style={{ padding: '12px 24px', borderTop: '1px solid var(--border)' }}>
+          <button
+            className="mobile-theme-toggle"
+            onClick={toggleTheme}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              width: '100%',
+              padding: '12px 16px',
+              background: 'var(--accent-soft)',
+              border: '1px solid var(--border)',
+              borderRadius: 'var(--r-md)',
+              cursor: 'pointer',
+              fontSize: '0.95rem',
+              fontWeight: 500,
+              color: 'var(--text-body)',
+              transition: 'all 0.2s var(--ease)',
+            }}
+          >
+            <span style={{ fontSize: '1.3rem' }}>{isDark ? '☀️' : '🌙'}</span>
+            <span>{isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}</span>
+          </button>
+        </div>
+
         <div className="mobile-drawer-cta">
           {user ? (
             <>
@@ -916,7 +556,7 @@ function Navbar() {
                 <div className="navbar-user-avatar">{user.name ? user.name.charAt(0).toUpperCase() : '?'}</div>
                 <div>
                   <div className="mobile-user-name">{user.name}</div>
-                  <div className="mobile-user-email">{user.email}</div>
+                  <a href={`mailto:${user.email}`} className="mobile-user-email" style={{ color: 'inherit', textDecoration: 'none' }}>{user.email}</a>
                 </div>
               </div>
               <button className="btn btn-primary" style={{ width: '100%' }} onClick={() => { logout(); setMobileOpen(false); }}>
@@ -956,7 +596,7 @@ function HeroSection() {
   ];
 
   const heroSlides = [
-    { src: '/hero-slide-1.png', alt: 'AI laboratory analyzing a glowing 3D brain with holographic dashboard', tag: t('slide.aiAnalysis'), title: t('slide.deepLearning'), time: t('slide.realtime'), link: '#analysis' },
+    { src: '/hero-slide-1.webp', alt: 'AI laboratory analyzing a glowing 3D brain with holographic dashboard', tag: t('slide.aiAnalysis'), title: t('slide.deepLearning'), time: t('slide.realtime'), link: '#analysis' },
     { 
       isFact: true, 
       tag: t('slide.genetics'), 
@@ -967,7 +607,7 @@ function HeroSection() {
       footerText: t('slide.geneticPenetrance'),
       link: '#about' 
     },
-    { src: '/hero-slide-2.png', alt: 'Patient undergoing brain MRI scan with healthcare professionals monitoring', tag: t('slide.mriScan'), title: t('slide.advancedMRI'), time: t('slide.3dVolumetric'), link: '#analysis' },
+    { src: '/hero-slide-2.webp', alt: 'Patient undergoing brain MRI scan with healthcare professionals monitoring', tag: t('slide.mriScan'), title: t('slide.advancedMRI'), time: t('slide.3dVolumetric'), link: '#analysis' },
     { 
       isFact: true, 
       tag: t('slide.prevalence'), 
@@ -978,7 +618,7 @@ function HeroSection() {
       footerText: t('slide.worldwide'),
       link: '#about' 
     },
-    { src: '/hero-slide-3.png', alt: 'Neurologist examining brain MRI scans on holographic displays', tag: t('slide.diagnostics'), title: t('slide.clinicalDecision'), time: t('slide.evidenceBased'), link: '#how-it-works' },
+    { src: '/hero-slide-3.webp', alt: 'Neurologist examining brain MRI scans on holographic displays', tag: t('slide.diagnostics'), title: t('slide.clinicalDecision'), time: t('slide.evidenceBased'), link: '#how-it-works' },
     { 
       isFact: true, 
       tag: t('slide.biomarkers'), 
@@ -989,7 +629,7 @@ function HeroSection() {
       footerText: t('slide.higherCounts'),
       link: '#about' 
     },
-    { src: '/hero-slide-4.png', alt: 'Doctor consulting patient about brain scan results', tag: t('slide.patientCare'), title: t('slide.actionableInsights'), time: t('slide.personalized'), link: '/memory-test' },
+    { src: '/hero-slide-4.webp', alt: 'Doctor consulting patient about brain scan results', tag: t('slide.patientCare'), title: t('slide.actionableInsights'), time: t('slide.personalized'), link: '/memory-test' },
     { 
       isFact: true, 
       tag: t('slide.progression'), 
@@ -1000,8 +640,8 @@ function HeroSection() {
       footerText: t('slide.earlyAI'),
       link: '#about' 
     },
-    { src: '/hero-slide-5.png', alt: 'Disease progression visualization from healthy to Huntington\'s stages', tag: t('slide.progression'), title: t('slide.hdStage'), time: t('slide.3stageModel'), link: '#about' },
-    { src: '/hero-slide-6.png', alt: 'AI healthcare platform with holographic brain model and analytics', tag: t('slide.platform'), title: t('slide.explainableDash'), time: t('slide.transparent'), link: '#how-it-works' },
+    { src: '/hero-slide-5.webp', alt: 'Disease progression visualization from healthy to Huntington\'s stages', tag: t('slide.progression'), title: t('slide.hdStage'), time: t('slide.3stageModel'), link: '#about' },
+    { src: '/hero-slide-6.webp', alt: 'AI healthcare platform with holographic brain model and analytics', tag: t('slide.platform'), title: t('slide.explainableDash'), time: t('slide.transparent'), link: '#how-it-works' },
   ];
 
   const handleExplore = (link) => {
@@ -1276,7 +916,7 @@ function AboutSection() {
       <div className="section-inner">
         <div className="about-grid">
           <div className="about-image reveal">
-            <img src="/dna-helix.png" alt="DNA double helix representing the HTT gene mutation in Huntington's Disease" />
+            <img src="/dna-helix.webp" alt="DNA double helix representing the HTT gene mutation in Huntington's Disease" loading="lazy" />
             <div className="about-image-badge">
               <div className="about-image-badge-icon">🧬</div>
               <div className="about-image-badge-text">
@@ -1721,6 +1361,63 @@ function ClinicalForm({ onSubmit, isLoading }) {
   const [fileError, setFileError] = useState(null);
   const [symptoms, setSymptoms] = useState([]);
   const [symptomsOpen, setSymptomsOpen] = useState(false);
+  const { toast } = useToast();
+  const { user, isDoctor } = useAuth();
+
+  // Patient selection for doctors
+  const [patients, setPatients] = useState([]);
+  const [selectedPatientId, setSelectedPatientId] = useState('');
+  const [loadingPatients, setLoadingPatients] = useState(false);
+  const [patientDropdownOpen, setPatientDropdownOpen] = useState(false);
+  const [patientSearchTerm, setPatientSearchTerm] = useState('');
+  const patientDropdownRef = useRef(null);
+
+  useEffect(() => {
+    if (isDoctor && user) {
+      setLoadingPatients(true);
+      fetch(`${API_BASE}/patients`)
+        .then((res) => (res.ok ? res.json() : { patients: [] }))
+        .then((data) => setPatients(data.patients || []))
+        .catch(() => setPatients([]))
+        .finally(() => setLoadingPatients(false));
+    }
+  }, [isDoctor, user]);
+
+  const selectedPatient = useMemo(
+    () => patients.find((p) => p._id === selectedPatientId) || null,
+    [patients, selectedPatientId]
+  );
+
+  // Close custom patient dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (patientDropdownRef.current && !patientDropdownRef.current.contains(e.target)) {
+        setPatientDropdownOpen(false);
+      }
+    };
+    if (patientDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [patientDropdownOpen]);
+
+  // Filter patients by search query
+  const filteredPatients = useMemo(() => {
+    if (!patientSearchTerm.trim()) return patients;
+    const term = patientSearchTerm.toLowerCase();
+    return patients.filter((p) => {
+      const name = (p.name || '').toLowerCase();
+      const email = (p.email || '').toLowerCase();
+      const age = String(p.age || '');
+      const gender = (p.gender || '').toLowerCase();
+      return (
+        name.includes(term) ||
+        email.includes(term) ||
+        age.includes(term) ||
+        gender.includes(term)
+      );
+    });
+  }, [patients, patientSearchTerm]);
 
   // Sync test scores when returning from test pages
   useEffect(() => {
@@ -1786,14 +1483,19 @@ function ClinicalForm({ onSubmit, isLoading }) {
     const validExts = ['.nii', '.nii.gz', '.gz', '.png', '.jpg', '.jpeg'];
     const name = file.name.toLowerCase();
     if (!validExts.some((ext) => name.endsWith(ext))) {
-      setFileError('Invalid format. Please upload a brain MRI image (.png, .jpg) or NIfTI file (.nii, .nii.gz)');
+      const err = 'Invalid format. Please upload a brain MRI image (.png, .jpg) or NIfTI file (.nii, .nii.gz)';
+      setFileError(err);
+      toast?.error(err);
       return;
     }
     if (file.size > MAX_FILE_SIZE_MB * 1e6) {
-      setFileError(`File too large. Maximum size is ${MAX_FILE_SIZE_MB} MB`);
+      const err = `File too large. Maximum size is ${MAX_FILE_SIZE_MB} MB`;
+      setFileError(err);
+      toast?.error(err);
       return;
     }
     setMriFile(file);
+    toast?.success(`Loaded ${file.name} for neuroimaging analysis.`);
   };
 
   const handleDrop = (e) => {
@@ -1814,8 +1516,11 @@ function ClinicalForm({ onSubmit, isLoading }) {
     });
     setTouched(allTouched);
     setErrors(allErrors);
-    if (!allRequiredValid) return;
-    onSubmit(form, mriFile, symptoms);
+    if (!allRequiredValid) {
+      toast?.error('Please complete all required clinical fields accurately.');
+      return;
+    }
+    onSubmit(form, mriFile, symptoms, selectedPatientId || null);
   };
 
   const renderField = (key) => {
@@ -1899,6 +1604,248 @@ function ClinicalForm({ onSubmit, isLoading }) {
     <div className="form-card">
       <h3 className="form-card-title">{t('analysis.patientAssessment')}</h3>
       <form onSubmit={handleSubmit} noValidate>
+        {/* Doctor-Patient Assignment Section */}
+        {user && user.role === 'doctor' && (
+          <div className="doctor-patient-assignment">
+            <div className="dpa-header">
+              <span className="dpa-icon">🧑‍⚕️</span>
+              <div className="dpa-title-wrap">
+                <h4 className="dpa-title">Assign to Patient</h4>
+                <p className="dpa-subtitle">
+                  Select a registered patient account so this analysis and report will be saved to their patient dashboard.
+                </p>
+              </div>
+            </div>
+
+            <div className="dpa-custom-picker" ref={patientDropdownRef}>
+              {/* Custom Trigger Button */}
+              <div
+                className={`dpa-picker-trigger ${patientDropdownOpen ? 'is-open' : ''} ${selectedPatient ? 'has-selection' : ''}`}
+                onClick={() => setPatientDropdownOpen((prev) => !prev)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setPatientDropdownOpen((prev) => !prev);
+                  }
+                }}
+              >
+                <div className="dpa-trigger-left">
+                  {selectedPatient ? (
+                    <>
+                      <div className="dpa-avatar-circle">
+                        {(selectedPatient.name || 'P')
+                          .split(' ')
+                          .map((n) => n[0])
+                          .join('')
+                          .slice(0, 2)
+                          .toUpperCase()}
+                      </div>
+                      <div className="dpa-trigger-info">
+                        <div className="dpa-trigger-name-row">
+                          <span className="dpa-trigger-name">{selectedPatient.name}</span>
+                          <span className="dpa-pill-badge age">Age {selectedPatient.age}</span>
+                          <span className="dpa-pill-badge gender">{selectedPatient.gender}</span>
+                        </div>
+                        <div className="dpa-meta-email">
+                          <span className="dpa-email-icon">✉</span>
+                          <span>{selectedPatient.email}</span>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="dpa-avatar-circle unassigned">🏥</div>
+                      <div className="dpa-trigger-info">
+                        <div className="dpa-trigger-name">General / Unassigned</div>
+                        <div className="dpa-trigger-sub">
+                          <span>Saved under Doctor profile (no patient linked)</span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                <div className="dpa-trigger-right">
+                  {selectedPatient && (
+                    <button
+                      type="button"
+                      className="dpa-trigger-clear-btn"
+                      title="Clear selection"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedPatientId('');
+                      }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                  <span className={`dpa-chevron ${patientDropdownOpen ? 'rotated' : ''}`}>▼</span>
+                </div>
+              </div>
+
+              {/* Floating Glassmorphic Menu */}
+              {patientDropdownOpen && (
+                <div className="dpa-dropdown-panel">
+                  {/* Search Input Bar */}
+                  <div className="dpa-search-box">
+                    <span className="dpa-search-icon">🔍</span>
+                    <input
+                      type="text"
+                      className="dpa-search-input"
+                      placeholder="Search patients by name, email, age..."
+                      value={patientSearchTerm}
+                      onChange={(e) => setPatientSearchTerm(e.target.value)}
+                      autoFocus
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                    {patientSearchTerm && (
+                      <button
+                        type="button"
+                        className="dpa-search-clear"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPatientSearchTerm('');
+                        }}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Dropdown Options List */}
+                  <div className="dpa-options-list">
+                    {/* General / Unassigned Option */}
+                    <div
+                      className={`dpa-option-item ${!selectedPatientId ? 'is-selected' : ''}`}
+                      onClick={() => {
+                        setSelectedPatientId('');
+                        setPatientDropdownOpen(false);
+                        setPatientSearchTerm('');
+                      }}
+                    >
+                      <div className="dpa-avatar-circle unassigned-small">🏥</div>
+                      <div className="dpa-option-details">
+                        <div className="dpa-option-name">General / Unassigned</div>
+                        <div className="dpa-option-sub">
+                          Saved under your Doctor profile (no patient linked)
+                        </div>
+                      </div>
+                      {!selectedPatientId && (
+                        <span className="dpa-selected-checkmark">✓</span>
+                      )}
+                    </div>
+
+                    <div className="dpa-section-divider">
+                      <span>Registered Patients ({filteredPatients.length})</span>
+                    </div>
+
+                    {/* Patient Cards */}
+                    {loadingPatients ? (
+                      <div className="dpa-empty-state">
+                        <span>⏳ Loading registered patients list...</span>
+                      </div>
+                    ) : filteredPatients.length === 0 ? (
+                      <div className="dpa-empty-state">
+                        <span className="dpa-empty-icon">🔎</span>
+                        <p>No patients matching "{patientSearchTerm}"</p>
+                        <button
+                          type="button"
+                          className="dpa-empty-clear-btn"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPatientSearchTerm('');
+                          }}
+                        >
+                          Clear search
+                        </button>
+                      </div>
+                    ) : (
+                      filteredPatients.map((p) => {
+                        const isThisSelected = selectedPatientId === p._id;
+                        const initials = (p.name || 'P')
+                          .split(' ')
+                          .map((n) => n[0])
+                          .join('')
+                          .slice(0, 2)
+                          .toUpperCase();
+
+                        return (
+                          <div
+                            key={p._id}
+                            className={`dpa-option-item ${isThisSelected ? 'is-selected' : ''}`}
+                            onClick={() => {
+                              setSelectedPatientId(p._id);
+                              if (p.age && !form.age) {
+                                set('age', p.age);
+                              }
+                              setPatientDropdownOpen(false);
+                              setPatientSearchTerm('');
+                            }}
+                          >
+                            <div className="dpa-avatar-circle patient-avatar">
+                              {initials}
+                            </div>
+                            <div className="dpa-option-details">
+                              <div className="dpa-option-name-row">
+                                <span className="dpa-option-name">{p.name}</span>
+                                <span className="dpa-badge-pill age">{p.age} yrs</span>
+                                <span className="dpa-badge-pill gender">{p.gender}</span>
+                              </div>
+                              <div className="dpa-option-sub email">{p.email}</div>
+                            </div>
+                            {isThisSelected && (
+                              <span className="dpa-selected-checkmark">✓</span>
+                            )}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Dropdown Footer */}
+                  <div className="dpa-dropdown-footer">
+                    <span>💡 Selecting a patient links this analysis to their medical history</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {selectedPatient && (
+              <div className="dpa-patient-card">
+                <div className="dpa-card-header">
+                  <span className="dpa-card-badge">✓ Linked to Patient Dashboard</span>
+                  <button
+                    type="button"
+                    className="dpa-card-clear"
+                    onClick={() => setSelectedPatientId('')}
+                  >
+                    ✕ Clear Selection
+                  </button>
+                </div>
+                <div className="dpa-card-body">
+                  <div className="dpa-patient-name">{selectedPatient.name}</div>
+                  <div className="dpa-patient-meta">
+                    <span>📧 {selectedPatient.email}</span>
+                    <span>🎂 Age: {selectedPatient.age}</span>
+                    <span>⚧ {selectedPatient.gender}</span>
+                  </div>
+                </div>
+                {form.age !== String(selectedPatient.age) && (
+                  <button
+                    type="button"
+                    className="btn-dpa-autofill"
+                    onClick={() => set('age', selectedPatient.age)}
+                  >
+                    ⚡ Auto-fill Patient Age ({selectedPatient.age} yrs)
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* MRI Upload */}
         <div className="form-section-label">{t('analysis.neuroimaging')}</div>
         <div
@@ -2362,111 +2309,7 @@ function ProgressionForecastCard({ result, lastForm }) {
   );
 }
 
-/* ═══════════════════════════════════════════
-   MEDICATION PRESCRIPTION CARD (Results Section)
-   ═══════════════════════════════════════════ */
 
-function MedicationPrescriptionCard({ result, lastForm }) {
-  const navigate = useNavigate();
-  const { t } = useLanguage();
-  if (!result || (!result.stage && !result.prediction)) return null;
-
-  const rx = generatePersonalizedPrescription(result, lastForm);
-  if (!rx) return null;
-
-  const stage = result.stage || result.prediction;
-  const sc = STAGE_CONFIG[stage] || STAGE_CONFIG.early;
-
-  return (
-    <div className="result-card rx-summary-card">
-      <div className="result-header">
-        <span>💊</span>
-        <span className="result-title">{t('med.patientRxTitle')}</span>
-        <span className="rx-ai-badge">AI Prescription</span>
-      </div>
-
-      <div className="rx-summary-banner" style={{ borderLeftColor: sc.color }}>
-        <div className="rx-banner-top">
-          <span className="rx-stage-pill" style={{ background: `${sc.color}20`, color: sc.color, borderColor: `${sc.color}40` }}>
-            🎯 {rx.stageTitle}
-          </span>
-          <span className="rx-confidence-pill">
-            Confidence: <strong>{rx.confidence}%</strong>
-          </span>
-        </div>
-        <p className="rx-summary-note">{rx.clinicalNotes}</p>
-      </div>
-
-      {/* Primary Prescribed Medications */}
-      <div className="rx-meds-preview-list">
-        <h4 className="rx-subheading">Core Prescribed Pharmacotherapy:</h4>
-        <div className="rx-meds-grid">
-          {rx.primaryMeds.map((med) => (
-            <div key={med.id} className="rx-med-box">
-              <div className="rx-med-box-top">
-                <span className="rx-med-icon">{med.icon}</span>
-                <div>
-                  <div className="rx-med-name">{med.name}</div>
-                  <div className="rx-med-target">{med.targetReason}</div>
-                </div>
-              </div>
-              <div className="rx-med-details-row">
-                <span className="rx-dose-tag"><strong>Dose:</strong> {med.customDose || med.standardDose}</span>
-                <span className="rx-timing-tag"><strong>Timing:</strong> {med.timingSummary}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Daily Pill Clock Schedule Preview */}
-      <div className="rx-timeline-preview">
-        <h4 className="rx-subheading">Daily Administration Schedule:</h4>
-        <div className="rx-timeline-slots">
-          {rx.dailyTimeline.map((slot, i) => (
-            <div key={i} className="rx-slot-box">
-              <div className="rx-slot-header">
-                <span className="rx-slot-time">{slot.time}</span>
-                <span className="rx-slot-name">{slot.slot}</span>
-              </div>
-              <ul className="rx-slot-pills">
-                {slot.pills.map((pill, pIdx) => (
-                  <li key={pIdx}>
-                    <span className="rx-pill-bullet">💊</span>
-                    <div>
-                      <strong>{pill.name}</strong>
-                      <span className="rx-pill-inst"> ({pill.instruction})</span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Deep Link Action Button to Full Medications Page */}
-      <div className="rx-card-actions">
-        <button
-          type="button"
-          className="btn-open-medications"
-          onClick={() => {
-            navigate(`/medications?stage=${stage}&source=prediction`);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-        >
-          <span>💊 View Complete Medication Plan & Dosing Guide</span>
-          <span className="btn-arrow">→</span>
-        </button>
-      </div>
-
-      <div className="rec-disclaimer">
-        <span className="rec-disclaimer-icon">⚠️</span>
-        <p>{t('med.disclaimer')}</p>
-      </div>
-    </div>
-  );
-}
 
 /* ═══════════════════════════════════════════
    RESULTS PANEL (3-state: idle / loading / results)
@@ -2476,6 +2319,7 @@ function MedicationPrescriptionCard({ result, lastForm }) {
 function ResultsPanel({ result, error, isLoading, lastForm }) {
   const [loadingStep, setLoadingStep] = useState(0);
   const { t } = useLanguage();
+  const { toast } = useToast();
 
   const loadingSteps = [
     { icon: '📤', label: t('loading.step1'), detail: t('loading.step1d') },
@@ -2697,30 +2541,12 @@ function ResultsPanel({ result, error, isLoading, lastForm }) {
             </div>
           </div>
         </div>
-        {result.stage_probabilities && (
-          <div className="prob-list" style={{ marginTop: 20 }}>
-            {[
-              { name: t('results.preManifest'), val: result.stage_probabilities.pre_manifest, color: 'var(--stage-pre)' },
-              { name: t('results.earlyHD'), val: result.stage_probabilities.early, color: 'var(--stage-early)' },
-              { name: t('results.advancedHD'), val: result.stage_probabilities.advanced, color: 'var(--stage-advanced)' },
-            ].map((p) => (
-              <div className="prob-row" key={p.name}>
-                <span className="prob-name">{p.name}</span>
-                <div className="prob-track">
-                  <div className="prob-fill" style={{ width: `${p.val * 100}%`, background: p.color }} />
-                </div>
-                <span className="prob-val">{(p.val * 100).toFixed(1)}%</span>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Progression Forecast */}
       <ProgressionForecastCard result={result} lastForm={lastForm} />
 
-      {/* AI Prescribed Medication Regimen */}
-      <MedicationPrescriptionCard result={result} lastForm={lastForm} />
+
 
       {/* SHAP Feature Attribution */}
       {result.shap_features?.length > 0 && (() => {
@@ -2803,15 +2629,182 @@ function ResultsPanel({ result, error, isLoading, lastForm }) {
         <div className="result-header">
           <span>🔥</span>
           <span className="result-title">{t('results.gradcam')}</span>
+          {result.primary_brain_region && (
+            <span className="gradcam-header-badge">
+              <span className="gradcam-pulse-dot" />
+              {result.primary_brain_region}
+            </span>
+          )}
         </div>
         {result.gradcam_url ? (
-          <div className="gradcam-wrap">
-            <img src={`${API_BASE}${result.gradcam_url}`} alt="GradCAM++ heatmap overlay on axial MRI slices" />
+          <div className="gradcam-container">
+            <div className="gradcam-wrap">
+              <img src={`${API_BASE}${result.gradcam_url}`} alt="GradCAM++ heatmap overlay on axial MRI slices" />
+            </div>
+
+            {/* Heatmap Color Guide */}
+            <div className="gradcam-guide-card">
+              <div className="gradcam-sub-header">
+                <span className="gradcam-sub-icon">🎨</span>
+                <span className="gradcam-sub-title">{t('results.whatColorsRepresent')}</span>
+                <span className="gradcam-spectrum-tag">{t('results.colorSpectrum')}</span>
+              </div>
+
+              {/* Spectrum gradient bar */}
+              <div className="gradcam-spectrum-box">
+                <div className="gradcam-spectrum-bar" />
+                <div className="gradcam-spectrum-ticks">
+                  <span>0% (Preserved)</span>
+                  <span>25% (Mild)</span>
+                  <span>50% (Moderate)</span>
+                  <span>75% (Elevated)</span>
+                  <span>100% (Critical)</span>
+                </div>
+              </div>
+
+              {/* Color Meaning Grid */}
+              <div className="gradcam-color-grid">
+                <div className="gradcam-color-chip chip-red">
+                  <div className="chip-badge-header">
+                    <span className="chip-color-dot dot-red" />
+                    <strong>{t('results.colorRedTitle')}</strong>
+                  </div>
+                  <p>{t('results.colorRedDesc')}</p>
+                </div>
+
+                <div className="gradcam-color-chip chip-yellow">
+                  <div className="chip-badge-header">
+                    <span className="chip-color-dot dot-yellow" />
+                    <strong>{t('results.colorYellowTitle')}</strong>
+                  </div>
+                  <p>{t('results.colorYellowDesc')}</p>
+                </div>
+
+                <div className="gradcam-color-chip chip-blue">
+                  <div className="chip-badge-header">
+                    <span className="chip-color-dot dot-blue" />
+                    <strong>{t('results.colorBlueTitle')}</strong>
+                  </div>
+                  <p>{t('results.colorBlueDesc')}</p>
+                </div>
+
+                <div className="gradcam-color-chip chip-gray">
+                  <div className="chip-badge-header">
+                    <span className="chip-color-dot dot-gray" />
+                    <strong>{t('results.colorGrayTitle')}</strong>
+                  </div>
+                  <p>{t('results.colorGrayDesc')}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Part of the Brain Section */}
+            <div className="gradcam-anatomy-card">
+              <div className="gradcam-sub-header">
+                <span className="gradcam-sub-icon">🧠</span>
+                <span className="gradcam-sub-title">{t('results.highlightedBrainRegions')}</span>
+                <span className="gradcam-focus-tag">
+                  {result.primary_brain_region || 'Striatum & Lateral Ventricles'}
+                </span>
+              </div>
+
+              <div className="gradcam-regions-grid">
+                {result.detected_brain_regions?.length > 0 ? (
+                  result.detected_brain_regions.map((reg) => (
+                    <div className={`gradcam-region-card ${reg.severity?.toLowerCase() || 'moderate'}`} key={reg.id || reg.name}>
+                      <div className="region-card-top">
+                        <div className="region-name-group">
+                          <span className="region-icon">
+                            {reg.name.includes('Caudate') ? '🔬' : reg.name.includes('Putamen') ? '⚡' : reg.name.includes('Ventricle') ? '💧' : '🌐'}
+                          </span>
+                          <div>
+                            <div className="region-name">{reg.name}</div>
+                            <div className="region-hemi">{reg.hemisphere} Hemisphere</div>
+                          </div>
+                        </div>
+                        <div className={`region-pill pill-${reg.severity?.toLowerCase() || 'moderate'}`}>
+                          {reg.percentage}% Attention
+                        </div>
+                      </div>
+                      <div className="region-bar-track">
+                        <div
+                          className={`region-bar-fill fill-${reg.severity?.toLowerCase() || 'moderate'}`}
+                          style={{ width: `${Math.max(8, reg.percentage)}%` }}
+                        />
+                      </div>
+                      <p className="region-clinical-note">{reg.clinical}</p>
+                    </div>
+                  ))
+                ) : (
+                  <>
+                    <div className="gradcam-region-card critical">
+                      <div className="region-card-top">
+                        <div className="region-name-group">
+                          <span className="region-icon">🔬</span>
+                          <div>
+                            <div className="region-name">{t('results.caudateTitle')}</div>
+                            <div className="region-hemi">Subcortical Striatum (Bilateral)</div>
+                          </div>
+                        </div>
+                        <div className="region-pill pill-critical">Primary Target</div>
+                      </div>
+                      <p className="region-clinical-note">{t('results.caudateDesc')}</p>
+                    </div>
+
+                    <div className="gradcam-region-card critical">
+                      <div className="region-card-top">
+                        <div className="region-name-group">
+                          <span className="region-icon">⚡</span>
+                          <div>
+                            <div className="region-name">{t('results.putamenTitle')}</div>
+                            <div className="region-hemi">Basal Ganglia Motor Loop</div>
+                          </div>
+                        </div>
+                        <div className="region-pill pill-critical">Motor Circuit</div>
+                      </div>
+                      <p className="region-clinical-note">{t('results.putamenDesc')}</p>
+                    </div>
+
+                    <div className="gradcam-region-card moderate">
+                      <div className="region-card-top">
+                        <div className="region-name-group">
+                          <span className="region-icon">💧</span>
+                          <div>
+                            <div className="region-name">{t('results.ventriclesTitle')}</div>
+                            <div className="region-hemi">Central Fluid Cavities</div>
+                          </div>
+                        </div>
+                        <div className="region-pill pill-moderate">Ex-Vacuo Dilation</div>
+                      </div>
+                      <p className="region-clinical-note">{t('results.ventriclesDesc')}</p>
+                    </div>
+
+                    <div className="gradcam-region-card moderate">
+                      <div className="region-card-top">
+                        <div className="region-name-group">
+                          <span className="region-icon">🌐</span>
+                          <div>
+                            <div className="region-name">{t('results.cortexTitle')}</div>
+                            <div className="region-hemi">Anterior & Neocortical Regions</div>
+                          </div>
+                        </div>
+                        <div className="region-pill pill-moderate">Cortical Thinning</div>
+                      </div>
+                      <p className="region-clinical-note">{t('results.cortexDesc')}</p>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
           </div>
         ) : (
           <div className="gradcam-empty">
             <div className="gradcam-empty-icon">🧠</div>
             <p>{t('results.uploadMRI')}</p>
+            <div className="gradcam-empty-hint">
+              <span>Heatmap color scale: <strong>Blue</strong> (Normal Baseline) → <strong>Yellow</strong> (Moderate) → <strong>Red</strong> (Severe Atrophy Focus)</span>
+              <span>Anatomical targets evaluated: <strong>Caudate Nucleus</strong>, <strong>Putamen</strong>, <strong>Lateral Ventricles</strong>, and <strong>Cerebral Cortex</strong></span>
+            </div>
           </div>
         )}
       </div>
@@ -2827,7 +2820,13 @@ function ResultsPanel({ result, error, isLoading, lastForm }) {
 
       {/* Download Report */}
       {lastForm && (
-        <button className="btn-download-report" onClick={() => downloadReport(lastForm, result)}>
+        <button
+          className="btn-download-report"
+          onClick={() => {
+            downloadReport(lastForm, result);
+            toast?.success('Clinical report downloaded successfully!');
+          }}
+        >
           {t('results.downloadReport')}
         </button>
       )}
@@ -4376,9 +4375,15 @@ async function getHistoryFromDB(userId) {
     const data = await res.json();
     // Transform MongoDB predictions to match the localStorage format
     return (data.predictions || []).map((p) => ({
-      id: p._id,
+      id: p._id || p.predictionId,
       date: p.createdAt,
       fromDB: true,
+      doctorId: p.doctorId,
+      doctorName: p.doctorName,
+      doctorEmail: p.doctorEmail,
+      patientId: p.patientId,
+      patientName: p.patientName,
+      patientEmail: p.patientEmail,
       form: p.clinicalInputs ? {
         cag_repeat: p.clinicalInputs.cag_repeat,
         motor_score: p.clinicalInputs.motor_score ?? (p.clinicalInputs.uhdrs_motor != null ? 100 - (p.clinicalInputs.uhdrs_motor / 1.24) : null),
@@ -4408,14 +4413,12 @@ async function getHistoryFromDB(userId) {
    PDF REPORT DOWNLOAD
    ═══════════════════════════════════════════ */
 
-function downloadReport(form, result) {
+function downloadReport(form, result, meta = {}) {
   const timestamp = new Date().toLocaleString();
   const stage = STAGE_CONFIG[result.prediction]?.label || result.prediction;
   const motorDisplay = form.motor_score != null ? `${form.motor_score}%` : form.uhdrs_motor != null ? `${form.uhdrs_motor}` : '—';
   const memoryDisplay = form.memory_score != null ? `${form.memory_score}%` : form.uhdrs_cognitive != null ? `${form.uhdrs_cognitive}` : '—';
   const funcDisplay = form.functional_score != null ? `${form.functional_score}%` : form.tfc_score != null ? `${form.tfc_score}` : '—';
-
-  const rx = generatePersonalizedPrescription(result, form);
 
   const html = `
     <!DOCTYPE html>
@@ -4433,11 +4436,17 @@ function downloadReport(form, result) {
       .disclaimer { margin-top: 40px; padding: 14px; background: #fff8f0; border: 1px solid #f0d0b0; border-radius: 8px; font-size: 0.8rem; color: #666; }
       .header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
       .logo { font-size: 1.5rem; }
-      .rx-notes { background: #fdf5ef; padding: 12px 16px; border-radius: 8px; font-size: 0.88rem; margin: 12px 0; border: 1px solid #f4a68e40; }
       @media print { body { margin: 20px; } }
     </style></head><body>
     <div class="header"><span class="logo">🧬</span><h1>NeuroSense — Assessment & Prediction Report</h1></div>
     <p style="color:#666;font-size:0.85rem;">Generated: ${timestamp}</p>
+    ${(meta.doctorName || meta.patientName) ? `
+    <h2>Clinical Consultation & Attending Physician</h2>
+    <table>
+      ${meta.patientName ? `<tr><th>Patient Name</th><td><strong>${meta.patientName}</strong> ${meta.patientEmail ? `<span style="color:#666;">(${meta.patientEmail})</span>` : ''}</td></tr>` : ''}
+      ${meta.doctorName ? `<tr><th>Attending Neurologist</th><td><strong>Dr. ${meta.doctorName}</strong> ${meta.doctorEmail ? `<span style="color:#666;">(${meta.doctorEmail})</span>` : ''}</td></tr>` : ''}
+      <tr><th>Clinical Facility</th><td>NeuroSense Cognitive & Neuroimaging Center</td></tr>
+    </table>` : ''}
     <h2>Patient & Assessment Data</h2>
     <table>
       <tr><th>Age</th><td>${form.age} years</td></tr>
@@ -4454,40 +4463,13 @@ function downloadReport(form, result) {
       ${result.progression_24m ? `<tr><th>24-Month Forecast</th><td>${(result.progression_24m * 100).toFixed(1)}% progression risk</td></tr>` : ''}
     </table>
     ${result.shap_values ? `<h2>Feature Importance (SHAP)</h2><table>${Object.entries(result.shap_values).map(([k,v]) => `<tr><th>${FEATURE_LABELS[k] || k}</th><td>${typeof v === 'number' ? v.toFixed(4) : v}</td></tr>`).join('')}</table>` : ''}
-    
-    ${rx ? `
-      <h2>AI Prescribed Medication Regimen & Schedule</h2>
-      <div class="rx-notes"><strong>Clinical Strategy:</strong> ${rx.clinicalNotes}</div>
-      <table>
-        <thead>
-          <tr style="background:#faf8f5;">
-            <th style="width:28%;">Medication</th>
-            <th style="width:22%;">Prescribed Dose</th>
-            <th style="width:25%;">Daily Timing</th>
-            <th style="width:25%;">Primary Objective</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${rx.primaryMeds.concat(rx.secondaryMeds).map(m => `
-            <tr>
-              <td><strong>${m.name}</strong><br><span style="font-size:0.78rem; color:#777;">${m.mechanism}</span></td>
-              <td><span class="badge" style="background:#e07a5f15; color:#c9623f;">${m.customDose || m.standardDose}</span></td>
-              <td>${m.timingSummary}</td>
-              <td>${m.targetReason || m.primaryObjective}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-      <h3>Daily Dosing Schedule</h3>
-      <table>
-        ${rx.dailyTimeline.map(slot => `
-          <tr>
-            <th>${slot.time} (${slot.slot})</th>
-            <td>${slot.pills.map(p => `<strong>${p.name}</strong> — <span style="color:#555;">${p.instruction}</span>`).join('<br>')}</td>
-          </tr>
-        `).join('')}
-      </table>
-    ` : ''}
+
+    <h2>Explainable AI (GradCAM++ Neuroimaging & Spatial Heatmap)</h2>
+    <table>
+      <tr><th>Heatmap Color Scale</th><td><strong>Crimson / Red (80–100%):</strong> Critical Neural Attention & Severe Localized Atrophy<br><strong>Yellow / Orange (50–80%):</strong> Moderate Activation & Intermediate Neurodegeneration<br><strong>Deep Blue / Cyan (5–50%):</strong> Baseline Preserved Brain Tissue<br><strong>Grayscale:</strong> Structural T1-weighted Cranial MRI (Parenchyma & Ventricles)</td></tr>
+      <tr><th>Targeted Brain Anatomy</th><td><strong>${result.primary_brain_region || 'Striatum (Caudate Nucleus & Putamen) with Lateral Ventricular Expansion'}</strong></td></tr>
+      <tr><th>Clinical Neuroanatomy</th><td>Hallmark HD pathology is characterized by progressive degeneration of GABAergic medium spiny neurons within the caudate nucleus and putamen, accompanied by ex-vacuo lateral ventricular enlargement and frontal-temporal cortical thinning.</td></tr>
+    </table>
 
     <div class="disclaimer"><strong>⚠️ Disclaimer:</strong> This report is generated by NeuroSense, an AI-powered detection and monitoring platform for individuals without direct clinical access. It is not a substitute for formal neurological diagnosis. Consult a qualified neurologist for personal healthcare decisions.</div>
     </body></html>
@@ -4550,6 +4532,8 @@ function DiseaseProgressionPage() {
   const { t } = useLanguage();
 
   useScrollReveal();
+
+  usePageMeta('Disease Progression — NeuroSense', 'Explore the stages of Huntington\'s Disease progression, from pre-manifest to advanced stages, with detailed clinical insights and biomarkers.');
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -4812,9 +4796,11 @@ function AnalysisHistoryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const { t } = useLanguage();
   const { user } = useAuth();
+  const { toast } = useToast();
   const userId = user?._id || null;
 
   useScrollReveal();
+  usePageMeta('Analysis History — NeuroSense', 'View your past Huntington\'s Disease analysis results, cognitive assessments, and track progression over time.');
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -4846,6 +4832,7 @@ function AnalysisHistoryPage() {
   const clearHistory = () => {
     // Only clear localStorage for this user — DB records are preserved
     clearLocalHistory(userId);
+    toast?.success('Local analysis history cleared successfully.');
     // Reload from DB only
     setIsLoading(true);
     getHistoryFromDB(userId).then((dbHistory) => {
@@ -4919,7 +4906,7 @@ function AnalysisHistoryPage() {
                           <div className="history-detail-row"><span>Memory Score:</span><span>{item.form?.memory_score != null ? `${item.form.memory_score}%` : item.form?.uhdrs_cognitive != null ? `${item.form.uhdrs_cognitive}` : '—'}</span></div>
                           <div className="history-detail-row"><span>Daily Function:</span><span>{item.form?.functional_score != null ? `${item.form.functional_score}%` : item.form?.tfc_score != null ? `${item.form.tfc_score}` : '—'}</span></div>
                           {item.result?.progression_12m && <div className="history-detail-row"><span>12m Forecast:</span><span>{(item.result.progression_12m * 100).toFixed(1)}%</span></div>}
-                          <button className="btn-download-sm" onClick={(e) => { e.stopPropagation(); downloadReport(item.form, item.result); }}>
+                          <button className="btn-download-sm" onClick={(e) => { e.stopPropagation(); downloadReport(item.form, item.result); toast?.success('Clinical report downloaded!'); }}>
                             📄 Download Report
                           </button>
                         </div>
@@ -4932,733 +4919,6 @@ function AnalysisHistoryPage() {
           )}
         </div>
       </section>
-      <Footer />
-    </ActiveSectionContext.Provider>
-  );
-}
-
-/* ═══════════════════════════════════════════
-   MEDICATIONS & PRESCRIPTION PAGE
-   ═══════════════════════════════════════════ */
-
-function MedicationsPage() {
-  const { t } = useLanguage();
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  const queryParams = new URLSearchParams(location.search);
-  const stageParam = queryParams.get('stage');
-  const sourceParam = queryParams.get('source');
-
-  const [selectedStageTab, setSelectedStageTab] = useState(() => {
-    if (stageParam === 'pre_manifest' || stageParam === 'Pre-manifest HD') return 'pre_manifest';
-    if (stageParam === 'advanced' || stageParam === 'Advanced Huntington\'s') return 'advanced';
-    if (stageParam === 'early' || stageParam === 'Early Huntington\'s') return 'early';
-    return 'all';
-  });
-
-  const [selectedCategory, setSelectedCategory] = useState('all');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [expandedCardId, setExpandedCardId] = useState(null);
-
-  // Titration calculator state
-  const [calcMedId, setCalcMedId] = useState('deutetrabenazine');
-  const [calcSymptomLevel, setCalcSymptomLevel] = useState('moderate');
-
-  // Load last analysis result from localStorage if available
-  const [lastAnalysis, setLastAnalysis] = useState(() => {
-    try {
-      const historyStr = localStorage.getItem('neurosense-history-anonymous');
-      if (historyStr) {
-        const history = JSON.parse(historyStr);
-        if (Array.isArray(history) && history.length > 0) {
-          return history[0];
-        }
-      }
-    } catch { /* no-op */ }
-    return null;
-  });
-
-  useScrollReveal();
-
-  useEffect(() => {
-    window.scrollTo(0, 0);
-  }, []);
-
-  useEffect(() => {
-    if (stageParam) {
-      if (stageParam === 'pre_manifest' || stageParam === 'Pre-manifest HD') setSelectedStageTab('pre_manifest');
-      else if (stageParam === 'advanced' || stageParam === 'Advanced Huntington\'s') setSelectedStageTab('advanced');
-      else if (stageParam === 'early' || stageParam === 'Early Huntington\'s') setSelectedStageTab('early');
-    }
-  }, [stageParam]);
-
-  // Determine active patient prescription
-  const effectiveStage = selectedStageTab !== 'all' ? selectedStageTab : (lastAnalysis?.result?.stage || lastAnalysis?.result?.prediction || 'early');
-  const simulatedResult = {
-    stage: effectiveStage,
-    confidence: lastAnalysis?.result?.confidence || 0.88,
-    risk_category: lastAnalysis?.result?.risk_category || 'medium',
-  };
-  const simulatedForm = {
-    motor_score: lastAnalysis?.form?.motor_score || 72,
-    memory_score: lastAnalysis?.form?.memory_score || 80,
-    age: lastAnalysis?.form?.age || 48,
-  };
-
-  const patientRx = useMemo(() => {
-    return generatePersonalizedPrescription(simulatedResult, simulatedForm);
-  }, [effectiveStage, lastAnalysis]);
-
-  // Filtered medications
-  const filteredMeds = useMemo(() => {
-    return MEDICATIONS_DATA.filter((med) => {
-      if (selectedStageTab !== 'all' && med.stage !== selectedStageTab) {
-        return false;
-      }
-      if (selectedCategory !== 'all' && med.category !== selectedCategory) {
-        return false;
-      }
-      if (searchTerm.trim()) {
-        const q = searchTerm.toLowerCase();
-        const matchName = med.name.toLowerCase().includes(q);
-        const matchGen = med.genericName.toLowerCase().includes(q);
-        const matchBrand = med.brandName.toLowerCase().includes(q);
-        const matchCat = med.categoryLabel.toLowerCase().includes(q);
-        const matchMech = med.mechanism.toLowerCase().includes(q);
-        const matchObj = med.primaryObjective.toLowerCase().includes(q);
-        return matchName || matchGen || matchBrand || matchCat || matchMech || matchObj;
-      }
-      return true;
-    });
-  }, [selectedStageTab, selectedCategory, searchTerm]);
-
-  const stageCounts = useMemo(() => {
-    return {
-      all: MEDICATIONS_DATA.length,
-      pre_manifest: MEDICATIONS_DATA.filter(m => m.stage === 'pre_manifest').length,
-      early: MEDICATIONS_DATA.filter(m => m.stage === 'early').length,
-      advanced: MEDICATIONS_DATA.filter(m => m.stage === 'advanced').length,
-    };
-  }, []);
-
-  const handlePrint = () => {
-    window.print();
-  };
-
-  // Titration calculator data
-  const selectedCalcMed = useMemo(() => {
-    return MEDICATIONS_DATA.find(m => m.id === calcMedId) || MEDICATIONS_DATA[4];
-  }, [calcMedId]);
-
-  const calcSchedule = useMemo(() => {
-    if (calcMedId === 'deutetrabenazine') {
-      return {
-        starting: '6 mg PO once daily in morning with food',
-        step1: '6 mg PO BID (12 mg/day) with breakfast & dinner',
-        step2: '9 mg PO BID (18 mg/day) with breakfast & dinner',
-        maintenance: calcSymptomLevel === 'severe' ? '18 mg – 24 mg BID (36–48 mg/day)' : calcSymptomLevel === 'moderate' ? '12 mg – 18 mg BID (24–36 mg/day)' : '6 mg – 12 mg BID (12–24 mg/day)',
-        food: 'Must take with meals; do not chew or crush',
-        maxLimit: '48 mg/day (36 mg/day in CYP2D6 poor metabolizers)',
-        monitoring: 'Weekly depression score & suicidal ideation check; QTc monitoring if combined with neuroleptics',
-      };
-    }
-    if (calcMedId === 'tetrabenazine') {
-      return {
-        starting: '12.5 mg PO once daily in morning',
-        step1: '12.5 mg PO BID (25 mg/day)',
-        step2: '12.5 mg PO TID (37.5 mg/day)',
-        maintenance: calcSymptomLevel === 'severe' ? '25 mg TID (75 mg/day)' : '12.5 mg – 25 mg TID (37.5–50 mg/day)',
-        food: 'With or without food; maintain consistent meal schedule',
-        maxLimit: '50 mg/day (poor metabolizer) / 100 mg/day (extensive)',
-        monitoring: 'Akathisia, parkinsonism, mood changes, insomnia',
-      };
-    }
-    if (calcMedId === 'olanzapine') {
-      return {
-        starting: '2.5 mg PO at bedtime (Zydis ODT preferred for dysphagia)',
-        step1: '2.5 mg AM / 2.5 mg Bedtime (5 mg/day)',
-        step2: '2.5 mg AM / 5.0 mg Bedtime (7.5 mg/day)',
-        maintenance: calcSymptomLevel === 'severe' ? '5 mg AM / 10 mg Bedtime (15 mg/day)' : '2.5 mg AM / 5 mg Bedtime (7.5 mg/day)',
-        food: 'ODT dissolves instantly on tongue without water',
-        maxLimit: '20 mg/day',
-        monitoring: 'Fasting glucose, lipid panel, weight, orthostasis',
-      };
-    }
-    if (calcMedId === 'baclofen') {
-      return {
-        starting: '5 mg PO TID with meals (15 mg/day)',
-        step1: '10 mg PO TID with meals (30 mg/day)',
-        step2: '15 mg PO TID with meals (45 mg/day)',
-        maintenance: calcSymptomLevel === 'severe' ? '20 mg PO TID (60 mg/day)' : '10 mg – 15 mg PO TID (30–45 mg/day)',
-        food: 'With food to minimize GI upset; oral liquid available for dysphagia',
-        maxLimit: '80 mg/day',
-        monitoring: 'Avoid abrupt discontinuation (seizure risk); monitor muscle tone & trunk stability',
-      };
-    }
-    // Default Sertraline
-    return {
-      starting: '25 mg – 50 mg PO once daily in morning',
-      step1: '50 mg PO once daily (after 2 weeks)',
-      step2: '75 mg PO once daily (after 4 weeks)',
-      maintenance: '50 mg – 150 mg PO once daily in morning',
-      food: 'Take with morning breakfast',
-      maxLimit: '200 mg/day',
-      monitoring: 'Initial 2-week GI distress, mood swings, serotonin syndrome watch',
-    };
-  }, [calcMedId, calcSymptomLevel]);
-
-  return (
-    <ActiveSectionContext.Provider value="medications">
-      <Particles />
-      <Navbar />
-
-      {/* Page Hero */}
-      <section className="page-hero" id="medications-hero">
-        <div className="page-hero-inner">
-          <div className="hero-badge">{t('med.badge')}</div>
-          <h1 className="hero-title">
-            {t('med.title1')} <span className="highlight">{t('med.titleHighlight')}</span>
-          </h1>
-          <p className="hero-description">{t('med.desc')}</p>
-          <div className="med-hero-actions">
-            <Link to="/" className="btn btn-secondary">{t('med.backHome')}</Link>
-            <button className="btn btn-primary" onClick={handlePrint}>
-              {t('med.printPrescription')}
-            </button>
-            {sourceParam === 'prediction' && (
-              <a href="#active-prescription" className="btn btn-secondary" style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}>
-                🎯 View Active AI Prescription
-              </a>
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* Main Medications Content */}
-      <section className="section med-section" id="medications-content">
-        <div className="section-inner">
-
-          {/* Active Patient Prescription Spotlight */}
-          {patientRx && (
-            <div className="med-patient-banner reveal" id="active-prescription" style={{ '--accent-glow': patientRx.stageColor }}>
-              <div className="med-patient-header">
-                <div className="med-patient-title-wrap">
-                  <span className="med-patient-icon">📋</span>
-                  <div>
-                    <h2 className="med-patient-title">{t('med.patientRxTitle')}</h2>
-                    <p className="med-patient-sub">{t('med.patientRxSub')}</p>
-                  </div>
-                </div>
-                <div className="med-patient-meta-badges">
-                  <span className="med-patient-badge" style={{ background: `${patientRx.stageColor}20`, color: patientRx.stageColor, border: `1px solid ${patientRx.stageColor}40` }}>
-                    🎯 {patientRx.stageTitle}
-                  </span>
-                  <span className="med-patient-badge confidence">
-                    AI Confidence: {patientRx.confidence}%
-                  </span>
-                  <span className={`med-patient-badge risk-${patientRx.risk}`}>
-                    Risk: {patientRx.risk.toUpperCase()}
-                  </span>
-                </div>
-              </div>
-
-              <div className="med-patient-clinical-note">
-                <strong>Clinical Assessment Summary:</strong> {patientRx.clinicalNotes}
-              </div>
-
-              {/* Prescribed Drug Grid */}
-              <div className="med-prescribed-grid">
-                <div className="med-prescribed-col">
-                  <h3 className="med-col-title">Primary Therapeutic Regimen:</h3>
-                  <div className="med-prescribed-cards">
-                    {patientRx.primaryMeds.map((med) => (
-                      <div key={med.id} className="med-prescribed-card primary">
-                        <div className="med-pcard-header">
-                          <span className="med-pcard-icon">{med.icon}</span>
-                          <div>
-                            <div className="med-pcard-name">{med.name}</div>
-                            <div className="med-pcard-brand">{med.brandName} · <span className="med-pcard-cat">{med.categoryLabel}</span></div>
-                          </div>
-                        </div>
-                        <div className="med-pcard-body">
-                          <div className="med-pcard-row">
-                            <span className="med-pcard-label">Prescribed Dose:</span>
-                            <span className="med-pcard-value dose-highlight">{med.customDose || med.standardDose}</span>
-                          </div>
-                          <div className="med-pcard-row">
-                            <span className="med-pcard-label">Daily Timing:</span>
-                            <span className="med-pcard-value">{med.timingSummary}</span>
-                          </div>
-                          <div className="med-pcard-row">
-                            <span className="med-pcard-label">Target Rationale:</span>
-                            <span className="med-pcard-value note">{med.targetReason}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="med-prescribed-col">
-                  <h3 className="med-col-title">Adjunctive & Supportive Regimen:</h3>
-                  <div className="med-prescribed-cards">
-                    {patientRx.secondaryMeds.map((med) => (
-                      <div key={med.id} className="med-prescribed-card secondary">
-                        <div className="med-pcard-header">
-                          <span className="med-pcard-icon">{med.icon}</span>
-                          <div>
-                            <div className="med-pcard-name">{med.name}</div>
-                            <div className="med-pcard-brand">{med.brandName} · <span className="med-pcard-cat">{med.categoryLabel}</span></div>
-                          </div>
-                        </div>
-                        <div className="med-pcard-body">
-                          <div className="med-pcard-row">
-                            <span className="med-pcard-label">Prescribed Dose:</span>
-                            <span className="med-pcard-value">{med.customDose || med.standardDose}</span>
-                          </div>
-                          <div className="med-pcard-row">
-                            <span className="med-pcard-label">Daily Timing:</span>
-                            <span className="med-pcard-value">{med.timingSummary}</span>
-                          </div>
-                          <div className="med-pcard-row">
-                            <span className="med-pcard-label">Target Rationale:</span>
-                            <span className="med-pcard-value note">{med.targetReason}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Daily Pill Clock Schedule Visualizer */}
-              <div className="med-daily-clock-section">
-                <h3 className="med-section-heading">
-                  <span>⏰</span> {t('med.dailySchedule')}
-                </h3>
-                <div className="med-clock-timeline">
-                  {patientRx.dailyTimeline.map((slot, sIdx) => (
-                    <div key={sIdx} className="med-clock-slot">
-                      <div className="med-clock-slot-badge">
-                        <span className="med-clock-time">{slot.time}</span>
-                        <span className="med-clock-name">{slot.slot}</span>
-                      </div>
-                      <div className="med-clock-pills">
-                        {slot.pills.map((pill, pIdx) => (
-                          <div key={pIdx} className="med-clock-pill-item">
-                            <span className="med-clock-pill-icon">💊</span>
-                            <div className="med-clock-pill-text">
-                              <span className="med-clock-pill-name">{pill.name}</span>
-                              <span className="med-clock-pill-inst">{pill.instruction}</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Titration Roadmap for Active Prescription */}
-              <div className="med-titration-section">
-                <h3 className="med-section-heading">
-                  <span>📈</span> {t('med.titrationRoadmap')}
-                </h3>
-                <div className="med-titration-steps">
-                  {patientRx.titrationPlan.map((step, tIdx) => (
-                    <div key={tIdx} className="med-titration-step">
-                      <div className="med-tstep-num">{tIdx + 1}</div>
-                      <div className="med-tstep-content">
-                        <div className="med-tstep-phase">{step.phase}</div>
-                        <div className="med-tstep-detail">{step.detail}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Action buttons inside prescription banner */}
-              <div className="med-patient-actions">
-                <button className="btn btn-primary" onClick={handlePrint}>
-                  🖨️ Print Patient Prescription
-                </button>
-                <button
-                  className="btn btn-secondary"
-                  onClick={() => {
-                    navigate('/');
-                    setTimeout(() => {
-                      document.getElementById('analysis')?.scrollIntoView({ behavior: 'smooth' });
-                    }, 150);
-                  }}
-                >
-                  🔬 Return to HD Analysis Dashboard
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Search and Filter Controls */}
-          <div className="med-controls-bar reveal">
-            {/* Search Input */}
-            <div className="med-search-wrap">
-              <span className="med-search-icon">🔍</span>
-              <input
-                type="text"
-                className="med-search-input"
-                placeholder={t('med.searchPlaceholder')}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-              {searchTerm && (
-                <button className="med-search-clear" onClick={() => setSearchTerm('')}>✕</button>
-              )}
-            </div>
-
-            {/* Stage Filter Tabs */}
-            <div className="med-stage-tabs">
-              <button
-                className={`med-stage-tab ${selectedStageTab === 'all' ? 'active' : ''}`}
-                onClick={() => setSelectedStageTab('all')}
-              >
-                <span>🌐 {t('med.tabsAll')}</span>
-                <span className="med-tab-count">{stageCounts.all}</span>
-              </button>
-              <button
-                className={`med-stage-tab pre ${selectedStageTab === 'pre_manifest' ? 'active' : ''}`}
-                onClick={() => setSelectedStageTab('pre_manifest')}
-              >
-                <span>🟢 {t('med.tabsPre')}</span>
-                <span className="med-tab-count">{stageCounts.pre_manifest}</span>
-              </button>
-              <button
-                className={`med-stage-tab early ${selectedStageTab === 'early' ? 'active' : ''}`}
-                onClick={() => setSelectedStageTab('early')}
-              >
-                <span>🟡 {t('med.tabsEarly')}</span>
-                <span className="med-tab-count">{stageCounts.early}</span>
-              </button>
-              <button
-                className={`med-stage-tab advanced ${selectedStageTab === 'advanced' ? 'active' : ''}`}
-                onClick={() => setSelectedStageTab('advanced')}
-              >
-                <span>🔴 {t('med.tabsAdv')}</span>
-                <span className="med-tab-count">{stageCounts.advanced}</span>
-              </button>
-            </div>
-
-            {/* Symptom Filter Pills */}
-            <div className="med-category-pills">
-              <span className="med-cat-label">{t('med.filterSymptom')}</span>
-              {[
-                { id: 'all', label: t('med.symptomAll'), icon: '✨' },
-                { id: 'chorea', label: t('med.symptomChorea'), icon: '⚡' },
-                { id: 'mood', label: t('med.symptomMood'), icon: '🧠' },
-                { id: 'sleep', label: t('med.symptomSleep'), icon: '🌙' },
-                { id: 'rigidity', label: t('med.symptomRigidity'), icon: '🩺' },
-                { id: 'neuroprotection', label: t('med.symptomNeuro'), icon: '🌿' },
-              ].map((cat) => (
-                <button
-                  key={cat.id}
-                  className={`med-cat-pill ${selectedCategory === cat.id ? 'active' : ''}`}
-                  onClick={() => setSelectedCategory(cat.id)}
-                >
-                  <span>{cat.icon}</span>
-                  <span>{cat.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Directory Count Header */}
-          <div className="med-directory-header reveal">
-            <h2 className="section-title">Clinical Medications Directory</h2>
-            <p className="section-subtitle">
-              Showing <strong>{filteredMeds.length}</strong> evidence-based medication protocols for Huntington's Disease management.
-            </p>
-          </div>
-
-          {/* Medication Cards Grid */}
-          <div className="med-cards-grid reveal">
-            {filteredMeds.map((med) => {
-              const isExpanded = expandedCardId === med.id;
-              const stageBadgeClass = med.stage === 'pre_manifest' ? 'stage-pre' : med.stage === 'advanced' ? 'stage-advanced' : 'stage-early';
-
-              return (
-                <div key={med.id} className={`med-card ${isExpanded ? 'expanded' : ''}`}>
-                  {/* Card Top */}
-                  <div className="med-card-top">
-                    <div className="med-card-icon-wrap">
-                      <span className="med-card-icon">{med.icon}</span>
-                    </div>
-                    <div className="med-card-title-block">
-                      <h3 className="med-card-title">{med.name}</h3>
-                      <div className="med-card-brand-row">
-                        <span className="med-card-brand">{med.brandName}</span>
-                        <span className="med-card-cat-badge">{med.categoryLabel}</span>
-                      </div>
-                    </div>
-                    <div className="med-card-stage-wrap">
-                      <span className={`med-stage-indicator ${stageBadgeClass}`}>
-                        {med.stageLabel}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Objective Summary */}
-                  <p className="med-card-objective">{med.primaryObjective}</p>
-
-                  {/* Key Metrics Row */}
-                  <div className="med-card-metrics">
-                    <div className="med-metric-box">
-                      <span className="med-metric-label">{t('med.standardDose')}</span>
-                      <span className="med-metric-val highlight">{med.standardDose}</span>
-                    </div>
-                    <div className="med-metric-box">
-                      <span className="med-metric-label">{t('med.timing')}</span>
-                      <span className="med-metric-val">{med.timingSummary}</span>
-                    </div>
-                  </div>
-
-                  {/* Daily Timing Schedule Pills */}
-                  <div className="med-timings-pills">
-                    <span className="med-timings-label">Daily Times:</span>
-                    <div className="med-timings-list">
-                      {med.timings.map((tm, idx) => (
-                        <span key={idx} className="med-timing-badge">
-                          <strong>{tm.time}</strong> ({tm.slot})
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Expandable Accordion */}
-                  {isExpanded && (
-                    <div className="med-card-details-accordion">
-                      {/* Starting & Titration */}
-                      <div className="med-detail-section">
-                        <h4 className="med-detail-title">📋 {t('med.titrationRoadmap')}</h4>
-                        <div className="med-detail-box">
-                          <p><strong>Starting Dose:</strong> {med.startingDose}</p>
-                          <p><strong>Titration Schedule:</strong> {med.titration}</p>
-                        </div>
-                      </div>
-
-                      {/* Administration & Food */}
-                      <div className="med-detail-section">
-                        <h4 className="med-detail-title">🍽️ {t('med.administration')}</h4>
-                        <div className="med-detail-box">
-                          <p>{med.administration}</p>
-                        </div>
-                      </div>
-
-                      {/* Mechanism */}
-                      <div className="med-detail-section">
-                        <h4 className="med-detail-title">🔬 {t('med.mechanism')}</h4>
-                        <div className="med-detail-box">
-                          <p>{med.mechanism}</p>
-                        </div>
-                      </div>
-
-                      {/* Side Effects & Precautions */}
-                      <div className="med-detail-section">
-                        <h4 className="med-detail-title">⚠️ {t('med.adverseEffects')}</h4>
-                        <div className="med-detail-box warning">
-                          <p><strong>Common Side Effects:</strong> {med.sideEffects.join(', ')}</p>
-                          <p><strong>Safety Alerts:</strong> {med.contraindications.join('; ')}</p>
-                        </div>
-                      </div>
-
-                      {/* Dysphagia Guidance */}
-                      <div className="med-detail-section">
-                        <h4 className="med-detail-title">🥄 Dysphagia & Swallowing Guidance</h4>
-                        <div className={`med-detail-box ${med.dysphagiaSafe ? 'safe' : 'caution'}`}>
-                          <p>{med.dysphagiaNotes}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Expand/Collapse Toggle Button */}
-                  <button
-                    className="med-card-expand-btn"
-                    onClick={() => setExpandedCardId(isExpanded ? null : med.id)}
-                  >
-                    <span>{isExpanded ? 'Hide Pharmacology Details ▲' : 'View Full Pharmacology & Dosing Guide ▼'}</span>
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-
-          {filteredMeds.length === 0 && (
-            <div className="med-empty-state reveal">
-              <span className="med-empty-icon">🔍</span>
-              <h3>No medications found matching your criteria</h3>
-              <p>Try clearing your search or switching stage and symptom filters.</p>
-              <button
-                className="btn btn-secondary"
-                onClick={() => { setSelectedStageTab('all'); setSelectedCategory('all'); setSearchTerm(''); }}
-              >
-                Reset All Filters
-              </button>
-            </div>
-          )}
-
-          {/* Interactive Titration Calculator Section */}
-          <div className="med-calc-section reveal">
-            <div className="med-calc-header">
-              <div className="med-calc-icon">🧮</div>
-              <div>
-                <h2 className="section-title">{t('med.calculatorTitle')}</h2>
-                <p className="section-subtitle">
-                  Simulate step-by-step weekly dose escalation and safety monitoring for top Huntington's Disease medications.
-                </p>
-              </div>
-            </div>
-
-            <div className="med-calc-panel">
-              <div className="med-calc-controls">
-                <div className="med-calc-field">
-                  <label className="med-calc-label">Select Medication:</label>
-                  <select
-                    className="med-calc-select"
-                    value={calcMedId}
-                    onChange={(e) => setCalcMedId(e.target.value)}
-                  >
-                    <option value="deutetrabenazine">Deutetrabenazine (Austedo) — Chorea</option>
-                    <option value="tetrabenazine">Tetrabenazine (Xenazine) — Chorea</option>
-                    <option value="olanzapine">Olanzapine (Zyprexa / Zydis) — Severe Chorea & Psychosis</option>
-                    <option value="baclofen">Baclofen (Lioresal) — Rigidity & Spasticity</option>
-                    <option value="sertraline">Sertraline (Zoloft) — Depression & Mood</option>
-                  </select>
-                </div>
-
-                <div className="med-calc-field">
-                  <label className="med-calc-label">Symptom Severity Level:</label>
-                  <div className="med-calc-radio-group">
-                    {['mild', 'moderate', 'severe'].map((lvl) => (
-                      <button
-                        key={lvl}
-                        className={`med-calc-radio ${calcSymptomLevel === lvl ? 'active' : ''}`}
-                        onClick={() => setCalcSymptomLevel(lvl)}
-                      >
-                        {lvl.charAt(0).toUpperCase() + lvl.slice(1)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Titration Output Roadmap */}
-              <div className="med-calc-results">
-                <h3 className="med-calc-res-title">
-                  Simulated Escalation Protocol for <strong>{selectedCalcMed.name}</strong> ({calcSymptomLevel.toUpperCase()} severity):
-                </h3>
-
-                <div className="med-calc-step-grid">
-                  <div className="med-cstep-card">
-                    <div className="med-cstep-header week1">Week 1 (Initiation)</div>
-                    <div className="med-cstep-dose">{calcSchedule.starting}</div>
-                    <div className="med-cstep-note">Establish tolerability & baseline vitals.</div>
-                  </div>
-
-                  <div className="med-cstep-card">
-                    <div className="med-cstep-header week2">Week 2 (Step 1)</div>
-                    <div className="med-cstep-dose">{calcSchedule.step1}</div>
-                    <div className="med-cstep-note">Assess early symptom response.</div>
-                  </div>
-
-                  <div className="med-cstep-card">
-                    <div className="med-cstep-header week3">Week 3 (Step 2)</div>
-                    <div className="med-cstep-dose">{calcSchedule.step2}</div>
-                    <div className="med-cstep-note">Monitor for somnolence or mood shifts.</div>
-                  </div>
-
-                  <div className="med-cstep-card maintenance">
-                    <div className="med-cstep-header target">Target Maintenance</div>
-                    <div className="med-cstep-dose">{calcSchedule.maintenance}</div>
-                    <div className="med-cstep-note">Long-term symptom control dose.</div>
-                  </div>
-                </div>
-
-                <div className="med-calc-safety-box">
-                  <div className="med-safety-item">
-                    <span className="med-safety-icon">🍽️</span>
-                    <div><strong>Administration:</strong> {calcSchedule.food}</div>
-                  </div>
-                  <div className="med-safety-item">
-                    <span className="med-safety-icon">🛑</span>
-                    <div><strong>Max Daily Limit:</strong> {calcSchedule.maxLimit}</div>
-                  </div>
-                  <div className="med-safety-item">
-                    <span className="med-safety-icon">🩺</span>
-                    <div><strong>Safety Monitoring:</strong> {calcSchedule.monitoring}</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Dysphagia & Swallowing Safety Guide */}
-          <div className="med-dysphagia-section reveal">
-            <div className="med-dysphagia-header">
-              <span className="med-dysphagia-icon">🥣</span>
-              <div>
-                <h2 className="section-title">{t('med.dysphagiaGuide')}</h2>
-                <p className="section-subtitle">
-                  Critical administration protocols for patients experiencing dysphagia and swallowing difficulties in Moderate to Advanced HD stages.
-                </p>
-              </div>
-            </div>
-
-            <div className="med-dysphagia-grid">
-              <div className="med-dysphagia-card">
-                <div className="med-dcard-icon">⚡</div>
-                <h4>Orally Disintegrating Tablets (ODT)</h4>
-                <p>
-                  Use formulations like Olanzapine Zydis ODT or Clonazepam ODT that instantly dissolve on the tongue with saliva, requiring zero water swallowing.
-                </p>
-              </div>
-
-              <div className="med-dysphagia-card">
-                <div className="med-dcard-icon">🧪</div>
-                <h4>Oral Liquid Solutions</h4>
-                <p>
-                  Utilize liquid solutions (e.g., Baclofen 5mg/5mL, Sertraline concentrate 20mg/mL) diluted into 4 oz of juice or water to eliminate choking risk.
-                </p>
-              </div>
-
-              <div className="med-dysphagia-card">
-                <div className="med-dcard-icon">⚠️</div>
-                <h4>Crushing Restrictions</h4>
-                <p>
-                  Never crush extended-release tablets (e.g., Austedo XR). Immediate-release tablets (Baclofen, Quetiapine) may be finely crushed into smooth applesauce.
-                </p>
-              </div>
-
-              <div className="med-dysphagia-card">
-                <div className="med-dcard-icon">🪑</div>
-                <h4>90° Upright Posture</h4>
-                <p>
-                  Patients must sit completely upright (90 degrees) during medication intake and remain upright for at least 30 minutes post-dose to prevent aspiration pneumonia.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Medical Disclaimer Card */}
-          <div className="med-disclaimer-card reveal">
-            <span className="med-disclaimer-icon">⚕️</span>
-            <div>
-              <h4>Medical Decision Support Notice</h4>
-              <p>{t('med.disclaimer')}</p>
-            </div>
-          </div>
-
-        </div>
-      </section>
-
       <Footer />
     </ActiveSectionContext.Provider>
   );
@@ -5695,25 +4955,27 @@ function Footer() {
           </p>
           <div className="footer-social">
             <a
-              href="https://github.com"
+              href="https://github.com/Suraj190805/NeuroSense"
               target="_blank"
               rel="noopener noreferrer"
               className="footer-social-link"
-              aria-label="GitHub"
+              aria-label="GitHub Repository"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
             </a>
             <a
-              href="https://linkedin.com"
+              href="https://www.linkedin.com/in/suraj-s"
               target="_blank"
               rel="noopener noreferrer"
               className="footer-social-link"
-              aria-label="LinkedIn"
+              aria-label="LinkedIn Profile"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
             </a>
             <a
-              href="mailto:suraj@example.com"
+              href="https://mail.google.com/mail/?view=cm&fs=1&to=surajsatish33@gmail.com"
+              target="_blank"
+              rel="noopener noreferrer"
               className="footer-social-link"
               aria-label="Email"
             >
@@ -5730,7 +4992,7 @@ function Footer() {
             <li><a href="#about" onClick={(e) => { e.preventDefault(); scrollTo('about'); }}>{t('nav.aboutHD')}</a></li>
             <li><a href="#how-it-works" onClick={(e) => { e.preventDefault(); scrollTo('how-it-works'); }}>{t('nav.howItWorks')}</a></li>
             <li><a href="#analysis" onClick={(e) => { e.preventDefault(); scrollTo('analysis'); }}>{t('nav.analysis')}</a></li>
-            <li><Link to="/medications">{t('nav.medications')}</Link></li>
+
             <li><Link to="/progression">{t('nav.progression')}</Link></li>
             <li><Link to="/memory-test">{t('nav.memoryTest')}</Link></li>
             <li><Link to="/motor-test">{t('nav.motorTest')}</Link></li>
@@ -5759,13 +5021,19 @@ function Footer() {
               Suraj S
             </li>
             <li>
-              <span className="footer-contact-icon">🏫</span>
-              SJC Institute of Technology
+              <a
+                href="https://mail.google.com/mail/?view=cm&fs=1&to=surajsatish33@gmail.com"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <span className="footer-contact-icon">✉️</span>
+                surajsatish33@gmail.com
+              </a>
             </li>
             <li>
-              <a href="mailto:suraj@example.com">
-                <span className="footer-contact-icon">✉️</span>
-                suraj@example.com
+              <a href="tel:+18005550199" className="footer-contact-link" aria-label="Call NeuroSense Support">
+                <span className="footer-contact-icon">📞</span>
+                +1 (800) 555-0199
               </a>
             </li>
           </ul>
@@ -5803,6 +5071,7 @@ function Footer() {
 function MemoryTestPage() {
   const { t } = useLanguage();
   useScrollReveal();
+  usePageMeta('Memory Assessment — NeuroSense', 'Take a comprehensive cognitive memory test designed to assess recall, recognition, and working memory as part of Huntington\'s Disease evaluation.');
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -6561,6 +5830,7 @@ function MotorTestSection() {
 function MotorTestPage() {
   const { t } = useLanguage();
   useScrollReveal();
+  usePageMeta('Motor Skills Test — NeuroSense', 'Evaluate motor coordination and reaction time with an interactive clinical motor assessment for Huntington\'s Disease screening.');
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -6601,16 +5871,34 @@ const QUICK_PROMPTS = [
   { icon: '🩺', label: 'HD Symptoms (Mayo)', prompt: 'What are the main movement, cognitive, and psychiatric symptoms of Huntington\'s Disease according to Mayo Clinic guidelines?' },
   { icon: '🧠', label: 'Early Signs & Staging', prompt: 'What are the earliest cognitive, mood, and motor warning signs of Huntington\'s Disease, and how are stages classified?' },
   { icon: '🔬', label: 'Symptom Scoring in AI', prompt: 'How does the NeuroSense platform use patient symptoms in its AI disease staging and SHAP feature attribution?' },
-  { icon: '💊', label: 'Austedo Dosing', prompt: 'What is the starting dose, titration schedule, and CYP2D6 limits for Deutetrabenazine (Austedo)?' },
-  { icon: '⚡', label: 'Chorea Meds', prompt: 'What are the first-line medication options for chorea in Huntington\'s Disease?' },
-  { icon: '🚨', label: 'Dysphagia / ODT', prompt: 'Which HD medications are available in ODT or liquid formulations for patients with swallowing difficulties?' },
-  { icon: '🩺', label: 'Baclofen / Rigidity', prompt: 'How is Baclofen titrated for rigidity and dystonia in advanced HD, and what are the precautions?' },
-  { icon: '😴', label: 'Sleep & Mood', prompt: 'What are safe medication options for nocturnal agitation, insomnia, and depression in HD?' },
+  { icon: '🧬', label: 'CAG Repeat Genetics', prompt: 'How does CAG repeat length correlate with age of onset and progression in Huntington\'s Disease?' },
+  { icon: '📊', label: 'UHDRS Assessment', prompt: 'What are the standard UHDRS motor assessment scores and cognitive markers used in HD staging?' },
+  { icon: '🧠', label: 'MRI Biomarkers', prompt: 'What specific structural brain changes, such as caudate and putamen atrophy, are observed on MRI in HD?' },
+  { icon: '🎯', label: 'Digital Motor Testing', prompt: 'How do reaction time, finger tapping cadence, and coordination tests evaluate motor function?' },
   { icon: '🧬', label: 'Gene Silencing', prompt: 'What is the current status of ASO gene silencing (like Tominersen/WVE-003) and AMT-130 trials?' },
 ];
 
+/* ═══════════════════════════════════════════
+   CHATBOT & PATIENT REPORT CONTEXT
+   ═══════════════════════════════════════════ */
+
+const ChatContext = createContext({
+  isOpen: false,
+  setIsOpen: () => {},
+  activeReport: null,
+  setActiveReport: () => {},
+  openWithReport: (report, prompt) => {},
+  pendingPrompt: '',
+  setPendingPrompt: () => {},
+});
+
+function useChat() {
+  return useContext(ChatContext);
+}
+
 function ChatBot() {
-  const [isOpen, setIsOpen] = useState(false);
+  const { isOpen, setIsOpen, activeReport, setActiveReport, pendingPrompt, setPendingPrompt } = useChat();
+  const { user } = useAuth();
   const [messages, setMessages] = useState(() => {
     try {
       return JSON.parse(localStorage.getItem('neurosense-chat-messages') || '[]');
@@ -6655,16 +5943,38 @@ function ChatBot() {
     }
   }, [isOpen]);
 
-  // Show welcome message on first open
+  // Handle pendingPrompt triggered from dashboard buttons
   useEffect(() => {
-    if (isOpen && messages.length === 0) {
+    if (pendingPrompt && isOpen && !isTyping) {
+      sendCustomMessage(pendingPrompt);
+      if (setPendingPrompt) setPendingPrompt('');
+    }
+  }, [pendingPrompt, isOpen, isTyping]);
+
+  // Handle active report welcome message
+  useEffect(() => {
+    if (isOpen && activeReport) {
+      const isDefaultWelcome = messages.length === 1 && messages[0].role === 'assistant' && (messages[0].content.includes('specialised in') || messages[0].content.includes('Chat cleared!'));
+      if (messages.length === 0 || isDefaultWelcome) {
+        const reportDate = activeReport.date ? new Date(activeReport.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent';
+        const stageLabel = STAGE_CONFIG[activeReport.result?.prediction]?.label || activeReport.result?.prediction || 'Clinical Assessment';
+        const docStr = activeReport.doctorName ? `by **Dr. ${activeReport.doctorName}**` : '';
+        const cagStr = activeReport.form?.cag_repeat ? ` (CAG Repeat: **${activeReport.form.cag_repeat}**)` : '';
+        
+        setMessages([{
+          role: 'assistant',
+          content: `Hello! 📄 I have loaded your clinical report from **${reportDate}** ${docStr}.\n\nYour assessment indicates **${stageLabel}**${cagStr}.\n\nI can explain what your stage, motor performance, and cognitive scores mean in plain language, or suggest tailored questions for your next neurology appointment. What would you like to know?`,
+          timestamp: new Date(),
+        }]);
+      }
+    } else if (isOpen && messages.length === 0) {
       setMessages([{
         role: 'assistant',
-        content: "Hello! 👋 I'm the **NeuroSense AI Assistant**, specialised in Huntington's Disease clinical symptoms, pharmacology, and platform analysis.\n\nI can help you with:\n- 🩺 **Clinical Symptoms & Staging** — Mayo Clinic criteria: Movement (chorea, dystonia), cognitive, and psychiatric signs\n- 🔬 **Platform AI Analysis** — How symptom selections, CAG repeats, digital tests & MRI predict disease stage\n- 💊 **Medications & Dosing** — Deutetrabenazine, Xenazine, Olanzapine, Baclofen, SSRIs\n- 🚨 **Special Formulations** — Dysphagia-safe ODTs, liquids, crushing rules\n- 🧬 **Genetics & Progression** — CAG repeats, UHDRS, TFC tracking\n- 🔬 **Emerging Therapies** — ASO gene silencing, AMT-130, clinical trials\n\nSelect a topic below or type your question!",
+        content: "Hello! 👋 I'm the **NeuroSense AI Assistant**, specialised in Huntington's Disease clinical symptoms, diagnostic assessment, and platform analysis.\n\nI can help you with:\n- 🩺 **Clinical Symptoms & Staging** — Movement, cognitive, and psychiatric signs\n- 🔬 **Platform AI Analysis** — How symptom selections, CAG repeats, digital tests & MRI predict disease stage\n- 🧬 **Genetics & Progression** — CAG repeats, UHDRS, TFC tracking\n- 🧠 **Neuroimaging & Tests** — Structural MRI biomarkers and motor/memory assessments\n- 🔬 **Emerging Research** — ASO gene silencing, AMT-130, and clinical trials\n\nSelect a topic below or type your question!",
         timestamp: new Date(),
       }]);
     }
-  }, [isOpen, messages.length]);
+  }, [isOpen, activeReport]);
 
   const toggleChat = () => {
     setIsOpen((prev) => !prev);
@@ -6722,6 +6032,21 @@ function ChatBot() {
     });
   };
 
+  const currentPrompts = useMemo(() => {
+    if (!activeReport) return QUICK_PROMPTS;
+    const cag = activeReport.form?.cag_repeat;
+    const stageName = STAGE_CONFIG[activeReport.result?.prediction]?.label || activeReport.result?.prediction || 'my predicted stage';
+    const docName = activeReport.doctorName ? `Dr. ${activeReport.doctorName}` : 'my neurologist';
+    return [
+      { icon: '📋', label: 'Explain Full Report', prompt: 'Can you explain my complete clinical report in plain, simple terms? What do all my scores mean?' },
+      ...(cag ? [{ icon: '🧬', label: `CAG Repeat (${cag})`, prompt: `My report shows a CAG repeat count of ${cag}. What does this mean for my condition and genetics?` }] : []),
+      { icon: '🧠', label: `My Stage: ${stageName}`, prompt: `My report indicates ${stageName}. What does this stage mean for my daily life and activities?` },
+      { icon: '🎯', label: 'Motor & Memory Scores', prompt: 'How did I perform on my motor and memory assessments, and what can I do to support my physical and cognitive health?' },
+      { icon: '👨‍⚕️', label: `Questions for ${docName}`, prompt: `What are the most important questions I should bring to ${docName} during my next visit based on this report?` },
+      { icon: '📈', label: 'Progression Risk', prompt: 'Can you explain the progression forecast in my report and what proactive steps I should discuss with my doctor?' },
+    ];
+  }, [activeReport]);
+
   const sendCustomMessage = async (msgText) => {
     const trimmed = (msgText || '').trim();
     if (!trimmed || isTyping) return;
@@ -6739,14 +6064,39 @@ function ChatBot() {
         .slice(-12)
         .map((m) => ({ role: m.role, content: m.content }));
 
-      // Call backend /chatbot/chat — which saves to MongoDB
+      // Prepare report context payload if an active report is loaded
+      const reportContextPayload = activeReport ? {
+        report_id: activeReport.id,
+        patient_id: user?._id || activeReport.patientId,
+        patient_name: activeReport.patientName || user?.name || 'Patient',
+        patient_email: activeReport.patientEmail || user?.email || '',
+        doctor_name: activeReport.doctorName || 'Neurologist',
+        doctor_email: activeReport.doctorEmail || '',
+        stage_label: STAGE_CONFIG[activeReport.result?.prediction]?.label || activeReport.result?.prediction,
+        prediction: activeReport.result?.prediction,
+        confidence: activeReport.result?.confidence,
+        cag_repeat: activeReport.form?.cag_repeat,
+        age: activeReport.form?.age,
+        motor_score: activeReport.form?.motor_score,
+        memory_score: activeReport.form?.memory_score,
+        functional_score: activeReport.form?.functional_score,
+        progression_12m: activeReport.result?.progression_12m || activeReport.result?.progression_12mo,
+        progression_24m: activeReport.result?.progression_24m || activeReport.result?.progression_24mo,
+        symptoms: activeReport.form?.symptoms,
+        shap_values: activeReport.result?.shap_values,
+        date: activeReport.date ? new Date(activeReport.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent',
+      } : null;
+
+      // Call backend /chatbot/chat — with report context and patient ID
       const res = await fetch(`${API_BASE}/chatbot/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: trimmed,
-          history: historyMsgs.slice(0, -1), // Exclude the current message (backend adds it)
+          history: historyMsgs.slice(0, -1),
           session_id: chatSessionId,
+          report_context: reportContextPayload,
+          patient_id: user?._id || null,
         }),
       });
 
@@ -6798,13 +6148,22 @@ function ChatBot() {
     setChatSessionId('');
     localStorage.removeItem('neurosense-chat-session-id');
     localStorage.removeItem('neurosense-chat-messages');
-    // Re-trigger welcome message
     setTimeout(() => {
-      setMessages([{
-        role: 'assistant',
-        content: "Chat cleared! 🔄 How can I help you with Huntington's Disease symptoms, medications, or platform analysis today?",
-        timestamp: new Date(),
-      }]);
+      if (activeReport) {
+        const reportDate = activeReport.date ? new Date(activeReport.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent';
+        const stageLabel = STAGE_CONFIG[activeReport.result?.prediction]?.label || activeReport.result?.prediction || 'Clinical Analysis';
+        setMessages([{
+          role: 'assistant',
+          content: `Chat cleared! 🔄 I am still connected to your **${stageLabel}** report from **${reportDate}**. How can I help you today?`,
+          timestamp: new Date(),
+        }]);
+      } else {
+        setMessages([{
+          role: 'assistant',
+          content: "Chat cleared! 🔄 How can I help you with Huntington's Disease symptoms, diagnostic assessments, or platform analysis today?",
+          timestamp: new Date(),
+        }]);
+      }
     }, 100);
   };
 
@@ -6827,7 +6186,7 @@ function ChatBot() {
             <div className="chatbot-header-info">
               <span className="chatbot-header-title">NeuroSense AI</span>
               <span className="chatbot-header-subtitle">
-                {isTyping ? 'Consulting clinical knowledge base...' : 'HD Symptoms, Clinical & Medication Assistant'}
+                {isTyping ? 'Consulting clinical knowledge base...' : activeReport ? 'Clinical Report Assistant' : 'HD Symptoms & Clinical Assessment Assistant'}
               </span>
             </div>
           </div>
@@ -6849,6 +6208,32 @@ function ChatBot() {
             </button>
           </div>
         </div>
+
+        {/* Active Report Header Bar */}
+        {activeReport && (
+          <div className="chatbot-report-banner">
+            <div className="chatbot-report-info">
+              <span className="chatbot-report-icon">📄</span>
+              <div className="chatbot-report-text">
+                <span className="chatbot-report-badge-title">
+                  Report: <strong>{STAGE_CONFIG[activeReport.result?.prediction]?.label || activeReport.result?.prediction || 'Clinical Analysis'}</strong>
+                  {activeReport.form?.cag_repeat ? ` (CAG: ${activeReport.form.cag_repeat})` : ''}
+                </span>
+                <span className="chatbot-report-badge-doc">
+                  {activeReport.doctorName ? `Dr. ${activeReport.doctorName}` : 'Neurologist'} • {activeReport.date ? new Date(activeReport.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recent'}
+                </span>
+              </div>
+            </div>
+            <button
+              className="chatbot-report-clear"
+              onClick={() => setActiveReport(null)}
+              title="Clear active report context"
+              aria-label="Clear active report context"
+            >
+              ✕
+            </button>
+          </div>
+        )}
 
         {/* Messages */}
         <div className="chatbot-messages">
@@ -6898,7 +6283,7 @@ function ChatBot() {
         {/* Quick Prompts Bar */}
         <div className="chatbot-quick-prompts">
           <div className="chatbot-quick-prompts-scroll">
-            {QUICK_PROMPTS.map((qp, idx) => (
+            {currentPrompts.map((qp, idx) => (
               <button
                 key={idx}
                 className="chatbot-quick-pill"
@@ -6922,7 +6307,7 @@ function ChatBot() {
           <textarea
             ref={inputRef}
             className="chatbot-input"
-            placeholder="Ask about HD medications, dosages, or stages..."
+            placeholder={activeReport ? "Ask anything about your clinical report, scores, or staging..." : "Ask about HD symptoms, staging, assessments, or genetics..."}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -6982,10 +6367,12 @@ function HomePage() {
   const activeSection = useActiveSection(sectionIds);
 
   useScrollReveal();
+  usePageMeta('NeuroSense — AI-Powered HD Clinical Dashboard', 'NeuroSense uses deep learning and MRI analysis for Huntington\'s Disease detection, cognitive assessments, and motor testing.');
 
   const { user } = useAuth();
+  const { toast } = useToast();
 
-  const handleSubmit = async (form, mriFile, symptoms = []) => {
+  const handleSubmit = async (form, mriFile, symptoms = [], patientId = null) => {
     setIsLoading(true);
     setError(null);
     setResult(null);
@@ -7011,9 +6398,15 @@ function HomePage() {
         fd.append('symptoms', symptoms.join(','));
       }
 
-      // Attach user ID so prediction is linked to this account
+      // Attach user ID and doctor ID so prediction is linked to accounts
       if (user?._id) {
         fd.append('user_id', user._id);
+        fd.append('doctor_id', user._id);
+      }
+
+      // If performed on behalf of a patient, link to patient
+      if (patientId) {
+        fd.append('patient_id', patientId);
       }
 
       // Route to the correct endpoint based on file type
@@ -7040,12 +6433,21 @@ function HomePage() {
       const data = await res.json();
       setResult(data);
       saveAnalysis(form, data, user?._id);
+      if (patientId) {
+        toast?.success("Analysis completed & saved to the patient's dashboard!");
+      } else {
+        toast?.success('Multimodal clinical analysis completed successfully!');
+      }
     } catch (err) {
-      setError(err.message || 'Failed to connect to NeuroSense API');
+      const msg = err.message || 'Failed to connect to NeuroSense API';
+      setError(msg);
+      toast?.error(msg);
     } finally {
       setIsLoading(false);
     }
   };
+
+  const { isPatient } = useAuth();
 
   return (
     <ActiveSectionContext.Provider value={activeSection}>
@@ -7058,7 +6460,11 @@ function HomePage() {
       <TechnologiesSection />
       <DatasetSection />
       <AIWorkflowSection />
-      <AnalysisSection onSubmit={handleSubmit} isLoading={isLoading} result={result} error={error} lastForm={lastForm} />
+      {isPatient ? (
+        <PatientHomeBanner />
+      ) : (
+        <AnalysisSection onSubmit={handleSubmit} isLoading={isLoading} result={result} error={error} lastForm={lastForm} />
+      )}
       <FAQSection />
       <AboutProjectSection />
       <Footer />
@@ -7070,10 +6476,13 @@ function HomePage() {
    AUTH CONTEXT
    ═══════════════════════════════════════════ */
 
-const AuthContext = createContext({ user: null, setUser: () => {}, logout: () => {} });
+const AuthContext = createContext({ user: null, setUser: () => {}, logout: () => {}, isPatient: false, isDoctor: true });
 
 function useAuth() {
-  return useContext(AuthContext);
+  const ctx = useContext(AuthContext);
+  const isPatient = ctx.user?.role === 'patient';
+  const isDoctor = !ctx.user || ctx.user?.role === 'doctor' || ctx.user?.role === 'admin';
+  return { ...ctx, isPatient, isDoctor };
 }
 
 /* ═══════════════════════════════════════════
@@ -7089,11 +6498,22 @@ function AuthPage() {
   const { isDark } = useContext(ThemeContext);
   const navigate = useNavigate();
   const { user, setUser } = useAuth();
+  const { toast } = useToast();
 
   // Redirect if already logged in
   useEffect(() => {
-    if (user) navigate('/');
+    if (user) {
+      if (user.role === 'patient') navigate('/patient-dashboard');
+      else navigate('/');
+    }
   }, [user, navigate]);
+
+  usePageMeta(
+    mode === 'login' ? 'Sign In — NeuroSense' : 'Create Account — NeuroSense',
+    mode === 'login'
+      ? 'Sign in to NeuroSense to access your HD analysis reports, cognitive assessments, and personalized clinical insights.'
+      : 'Create a NeuroSense account for AI-powered Huntington\'s Disease analysis, cognitive testing, and progression tracking.'
+  );
 
   // Login form state
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
@@ -7102,6 +6522,12 @@ function AuthPage() {
     name: '', email: '', password: '', confirmPassword: '',
     age: '', gender: 'male', role: 'patient',
   });
+
+  // Role descriptions for the selector
+  const ROLE_OPTIONS = [
+    { value: 'patient', label: 'Patient', icon: '🧑‍🦽', desc: 'View reports & track progress' },
+    { value: 'doctor', label: 'Doctor', icon: '🩺', desc: 'Full clinical access & analysis' },
+  ];
 
   const switchMode = (newMode) => {
     setMode(newMode);
@@ -7130,9 +6556,17 @@ function AuthPage() {
       const data = await res.json();
       localStorage.setItem('neurosense-user', JSON.stringify(data.user));
       setUser(data.user);
-      navigate('/');
+      toast?.success('Welcome back! Signed in successfully.');
+      // Role-based redirect: patients go to their dashboard, doctors go to home
+      if (data.user.role === 'patient') {
+        navigate('/patient-dashboard');
+      } else {
+        navigate('/');
+      }
     } catch (err) {
-      setError(err.message || 'Login failed');
+      const msg = err.message || 'Login failed';
+      setError(msg);
+      toast?.error(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -7145,15 +6579,21 @@ function AuthPage() {
 
     // Validation
     if (registerForm.password.length < 6) {
-      setError('Password must be at least 6 characters');
+      const msg = 'Password must be at least 6 characters';
+      setError(msg);
+      toast?.error(msg);
       return;
     }
     if (registerForm.password !== registerForm.confirmPassword) {
-      setError('Passwords do not match');
+      const msg = 'Passwords do not match';
+      setError(msg);
+      toast?.error(msg);
       return;
     }
     if (!registerForm.age || parseFloat(registerForm.age) <= 0) {
-      setError('Please enter a valid age');
+      const msg = 'Please enter a valid age';
+      setError(msg);
+      toast?.error(msg);
       return;
     }
 
@@ -7178,11 +6618,15 @@ function AuthPage() {
         throw new Error(err.detail || 'Registration failed');
       }
 
-      setSuccess('Account created successfully! You can now log in.');
+      const successMsg = 'Account created successfully! You can now sign in.';
+      setSuccess(successMsg);
+      toast?.success(successMsg);
       setRegisterForm({ name: '', email: '', password: '', confirmPassword: '', age: '', gender: 'male', role: 'patient' });
-      setTimeout(() => switchMode('login'), 1500);
+      setTimeout(() => switchMode('login'), 1200);
     } catch (err) {
-      setError(err.message || 'Registration failed');
+      const msg = err.message || 'Registration failed';
+      setError(msg);
+      toast?.error(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -7202,13 +6646,13 @@ function AuthPage() {
                 <div className="navbar-logo">🧬</div>
                 <span className="navbar-name">NeuroSense</span>
               </div>
-              <h1 className="auth-branding-title">
-                {mode === 'login' ? 'Welcome Back' : 'Join NeuroSense'}
-              </h1>
+              <h2 className="auth-branding-title">
+                {mode === 'login' ? 'Welcome Back to Clinical Intelligence' : 'Start Multimodal Neurological Analysis'}
+              </h2>
               <p className="auth-branding-subtitle">
                 {mode === 'login'
-                  ? 'Sign in to access your HD analysis reports, cognitive assessments, and personalized insights.'
-                  : 'Create your account to begin AI-powered Huntington\'s Disease analysis and tracking.'}
+                  ? 'Access patient biomarkers, 3D GradCAM explainability maps, and personalized Huntington\'s Disease therapies.'
+                  : 'Join neurologists, researchers, and patients worldwide utilizing deep learning for early HD detection and progression tracking.'}
               </p>
               <div className="auth-branding-features">
                 <div className="auth-feature">
@@ -7256,14 +6700,14 @@ function AuthPage() {
 
             {/* Error / Success Messages */}
             {error && (
-              <div className="auth-message auth-error">
-                <span className="auth-msg-icon">⚠️</span>
+              <div className="auth-error" role="alert">
+                <span>⚠️</span>
                 {error}
               </div>
             )}
             {success && (
-              <div className="auth-message auth-success">
-                <span className="auth-msg-icon">✅</span>
+              <div className="auth-success" role="alert">
+                <span>✅</span>
                 {success}
               </div>
             )}
@@ -7279,7 +6723,6 @@ function AuthPage() {
                       id="login-email"
                       type="email"
                       className="auth-input"
-                      placeholder="you@example.com"
                       value={loginForm.email}
                       onChange={(e) => setLoginForm({ ...loginForm, email: e.target.value })}
                       required
@@ -7296,7 +6739,6 @@ function AuthPage() {
                       id="login-password"
                       type={showPassword ? 'text' : 'password'}
                       className="auth-input"
-                      placeholder="Enter your password"
                       value={loginForm.password}
                       onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
                       required
@@ -7336,7 +6778,26 @@ function AuthPage() {
 
             {/* Register Form */}
             {mode === 'register' && (
+              /* Role Selector at the top of the register form */
               <form className="auth-form" onSubmit={handleRegister}>
+                {/* Role Selector */}
+                <div className="auth-field">
+                  <label className="auth-label">I am a</label>
+                  <div className="auth-role-selector">
+                    {ROLE_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        className={`auth-role-option ${registerForm.role === opt.value ? 'active' : ''}`}
+                        onClick={() => setRegisterForm({ ...registerForm, role: opt.value })}
+                      >
+                        <span className="auth-role-icon">{opt.icon}</span>
+                        <span className="auth-role-label">{opt.label}</span>
+                        <span className="auth-role-desc">{opt.desc}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div className="auth-field">
                   <label className="auth-label" htmlFor="reg-name">Full Name</label>
                   <div className="auth-input-wrap">
@@ -7345,7 +6806,6 @@ function AuthPage() {
                       id="reg-name"
                       type="text"
                       className="auth-input"
-                      placeholder="John Doe"
                       value={registerForm.name}
                       onChange={(e) => setRegisterForm({ ...registerForm, name: e.target.value })}
                       required
@@ -7362,7 +6822,6 @@ function AuthPage() {
                       id="reg-email"
                       type="email"
                       className="auth-input"
-                      placeholder="you@example.com"
                       value={registerForm.email}
                       onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })}
                       required
@@ -7380,7 +6839,6 @@ function AuthPage() {
                         id="reg-age"
                         type="number"
                         className="auth-input"
-                        placeholder="25"
                         min="1"
                         max="120"
                         value={registerForm.age}
@@ -7415,7 +6873,6 @@ function AuthPage() {
                       id="reg-password"
                       type={showPassword ? 'text' : 'password'}
                       className="auth-input"
-                      placeholder="Min 6 characters"
                       value={registerForm.password}
                       onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
                       required
@@ -7441,7 +6898,6 @@ function AuthPage() {
                       id="reg-confirm"
                       type={showPassword ? 'text' : 'password'}
                       className="auth-input"
-                      placeholder="Repeat password"
                       value={registerForm.confirmPassword}
                       onChange={(e) => setRegisterForm({ ...registerForm, confirmPassword: e.target.value })}
                       required
@@ -7479,6 +6935,616 @@ function AuthPage() {
 }
 
 /* ═══════════════════════════════════════════
+   404 NOT FOUND PAGE
+   ═══════════════════════════════════════════ */
+
+function NotFoundPage() {
+  usePageMeta('404 Page Not Found — NeuroSense', 'The requested clinical route or page could not be located.');
+  useEffect(() => { window.scrollTo(0, 0); }, []);
+
+  return (
+    <>
+      <Navbar />
+      <main className="not-found-page">
+        <div className="not-found-container reveal visible">
+          <div className="not-found-badge">
+            <span>🧠</span> Error 404
+          </div>
+          <h1 className="not-found-code">404</h1>
+          <h2 className="not-found-title">Neurological Path Not Found</h2>
+          <p className="not-found-desc">
+            The page or clinical protocol you are searching for does not exist, has been relocated, or is temporarily unavailable.
+          </p>
+          <div className="not-found-actions">
+            <Link to="/" className="btn btn-primary">
+              ← Return to Dashboard
+            </Link>
+            <Link to="/memory-test" className="btn btn-secondary">
+              🧠 Take Memory Assessment
+            </Link>
+            <Link to="/progression" className="btn btn-secondary">
+              📈 Track Progression
+            </Link>
+          </div>
+        </div>
+      </main>
+      <Footer />
+    </>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   EMPTY STATE COMPONENT & PREVIEW PAGE
+   ═══════════════════════════════════════════ */
+
+function EmptyState({
+  icon = '📭',
+  title = 'No Records Found',
+  description = 'There are no active records or data entries to display at this time.',
+  primaryActionText,
+  primaryActionLink,
+  onPrimaryAction,
+  secondaryActionText,
+  secondaryActionLink,
+  onSecondaryAction,
+}) {
+  return (
+    <div className="empty-state-card reveal visible">
+      <div className="empty-state-icon-wrap">
+        <span>{icon}</span>
+      </div>
+      <h3 className="empty-state-title">{title}</h3>
+      <p className="empty-state-desc">{description}</p>
+      <div className="empty-state-actions">
+        {primaryActionLink ? (
+          <Link to={primaryActionLink} className="btn btn-primary">
+            {primaryActionText}
+          </Link>
+        ) : primaryActionText && (
+          <button className="btn btn-primary" onClick={onPrimaryAction}>
+            {primaryActionText}
+          </button>
+        )}
+        {secondaryActionLink ? (
+          <Link to={secondaryActionLink} className="btn btn-secondary">
+            {secondaryActionText}
+          </Link>
+        ) : secondaryActionText && (
+          <button className="btn btn-secondary" onClick={onSecondaryAction}>
+            {secondaryActionText}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function EmptyStatePage() {
+  const [activeTab, setActiveTab] = useState('history');
+  usePageMeta('Empty States — NeuroSense', 'Preview system empty states for clinical analyses and assessments.');
+  useEffect(() => { window.scrollTo(0, 0); }, []);
+
+  const emptyStates = {
+    history: {
+      icon: '📊',
+      title: 'No Analysis History Yet',
+      description: 'You have not performed any multimodal Huntington\'s Disease analyses. Upload an MRI or enter clinical markers to generate your first diagnostic report.',
+      primaryActionText: 'Run First Analysis',
+      primaryActionLink: '/',
+      secondaryActionText: 'Explore Sample Report',
+      secondaryActionLink: '/history',
+    },
+
+    assessments: {
+      icon: '🧠',
+      title: 'No Assessment Scores Recorded',
+      description: 'Take standardized digital motor or cognitive assessments to track reaction time, coordination, and visuospatial working memory over time.',
+      primaryActionText: 'Take Memory Test',
+      primaryActionLink: '/memory-test',
+      secondaryActionText: 'Take Motor Test',
+      secondaryActionLink: '/motor-test',
+    },
+  };
+
+  const current = emptyStates[activeTab];
+
+  return (
+    <>
+      <Navbar />
+      <main className="empty-state-page">
+        <div className="section-inner">
+          <div style={{ textAlign: 'center', marginBottom: '28px' }}>
+            <div className="section-label" style={{ margin: '0 auto 8px' }}>System State Preview</div>
+            <h1 className="section-title">Empty State Experience</h1>
+            <p className="hero-description" style={{ margin: '0 auto 20px', maxWidth: '540px' }}>
+              Standardized, accessible empty states designed to guide users when no diagnostic data is available.
+            </p>
+          </div>
+
+          <div className="empty-state-tabs">
+            <button
+              className={`empty-state-tab-btn ${activeTab === 'history' ? 'active' : ''}`}
+              onClick={() => setActiveTab('history')}
+            >
+              📊 Analysis History
+            </button>
+            <button
+              className={`empty-state-tab-btn ${activeTab === 'assessments' ? 'active' : ''}`}
+              onClick={() => setActiveTab('assessments')}
+            >
+              🧠 Assessments
+            </button>
+          </div>
+
+          <EmptyState {...current} />
+        </div>
+      </main>
+      <Footer />
+    </>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   PATIENT HOME BANNER (shown instead of AnalysisSection for patients)
+   ═══════════════════════════════════════════ */
+
+function PatientHomeBanner() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  useScrollReveal();
+
+  return (
+    <section className="section patient-home-banner" id="analysis">
+      <div className="section-inner">
+        <div className="patient-banner-card reveal visible">
+          <div className="patient-banner-icon">🧑‍🦽</div>
+          <h2 className="patient-banner-title">
+            Welcome, <span className="highlight">{user?.name?.split(' ')[0] || 'Patient'}</span>
+          </h2>
+          <p className="patient-banner-desc">
+            Clinical analyses and assessments are performed by your neurologist.
+            You can view your reports, track progression, and download results from your dashboard.
+          </p>
+          <div className="patient-banner-actions">
+            <button className="btn btn-primary" onClick={() => navigate('/patient-dashboard')}>
+              📋 Go to My Dashboard
+            </button>
+            <button className="btn btn-secondary" onClick={() => navigate('/history')}>
+              📊 View Analysis History
+            </button>
+            <button className="btn btn-secondary" onClick={() => navigate('/progression')}>
+              📈 Track Progression
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   PATIENT DASHBOARD PAGE
+   ═══════════════════════════════════════════ */
+
+function PatientDashboardPage() {
+  const { user, isPatient } = useAuth();
+  const { openWithReport } = useChat();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { t } = useLanguage();
+  const userId = user?._id || null;
+
+  const [reports, setReports] = useState([]);
+  const [tests, setTests] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [expandedReport, setExpandedReport] = useState(null);
+  const [selectedReportId, setSelectedReportId] = useState(null);
+
+  useScrollReveal();
+  usePageMeta('Patient Dashboard — NeuroSense', 'View your HD analysis reports, test results, and track disease progression from your personalized patient dashboard.');
+
+  // Redirect non-patients
+  useEffect(() => {
+    if (!user) { navigate('/login'); return; }
+    if (!isPatient) { navigate('/'); return; }
+  }, [user, isPatient, navigate]);
+
+  // Fetch reports and tests
+  useEffect(() => {
+    if (!userId) return;
+    setIsLoading(true);
+
+    Promise.all([
+      getHistoryFromDB(userId),
+      fetch(`${API_BASE}/users/${userId}/tests`).then(r => r.ok ? r.json() : { tests: [] }).catch(() => ({ tests: [] })),
+    ]).then(([dbReports, testData]) => {
+      setReports(dbReports);
+      setTests(testData.tests || []);
+      setIsLoading(false);
+    });
+  }, [userId]);
+
+  const latestReport = reports[0] || null;
+  const currentReport = (selectedReportId ? reports.find(r => r.id === selectedReportId) : null) || latestReport;
+  const stage = latestReport ? STAGE_CONFIG[latestReport.result?.prediction] : null;
+
+  return (
+    <ActiveSectionContext.Provider value="patient-dashboard">
+      <Particles />
+      <Navbar />
+
+      {/* Dashboard Hero */}
+      <section className="page-hero" id="patient-dashboard-hero">
+        <div className="page-hero-inner">
+          <div className="hero-badge">🧑‍🦽 Patient Portal</div>
+          <h1 className="hero-title">
+            Welcome, <span className="highlight">{user?.name?.split(' ')[0] || 'Patient'}</span>
+          </h1>
+          <p className="hero-description">
+            Access your clinical reports, view test results, and track your health progression — all in one place.
+          </p>
+        </div>
+      </section>
+
+      {/* Dashboard Content */}
+      <section className="section">
+        <div className="section-inner">
+
+          {/* Quick Stats Row */}
+          <div className="patient-stats-row reveal visible">
+            <div className="patient-stat-card">
+              <div className="patient-stat-icon">📊</div>
+              <div className="patient-stat-value">{reports.length}</div>
+              <div className="patient-stat-label">Total Reports</div>
+            </div>
+            <div className="patient-stat-card">
+              <div className="patient-stat-icon">🧪</div>
+              <div className="patient-stat-value">{tests.length}</div>
+              <div className="patient-stat-label">Tests Taken</div>
+            </div>
+            <div className="patient-stat-card">
+              <div className="patient-stat-icon">{stage ? '🔬' : '—'}</div>
+              <div className="patient-stat-value" style={{ fontSize: '1rem', color: stage?.color || 'var(--text-muted)' }}>
+                {stage?.label || 'No Analysis Yet'}
+              </div>
+              <div className="patient-stat-label">Latest Stage</div>
+            </div>
+            <div className="patient-stat-card">
+              <div className="patient-stat-icon">📅</div>
+              <div className="patient-stat-value" style={{ fontSize: '0.95rem' }}>
+                {latestReport ? new Date(latestReport.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+              </div>
+              <div className="patient-stat-label">Last Analysis</div>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="patient-quick-actions reveal visible">
+            <button className="patient-action-card" onClick={() => navigate('/history')}>
+              <span className="patient-action-icon">📊</span>
+              <span className="patient-action-text">Analysis History</span>
+            </button>
+            <button className="patient-action-card" onClick={() => navigate('/progression')}>
+              <span className="patient-action-icon">📈</span>
+              <span className="patient-action-text">Track Progression</span>
+            </button>
+          </div>
+
+          {/* AI Clinical Report Assistant Card */}
+          {currentReport && (
+            <div className="patient-ai-card reveal visible">
+              <div className="patient-ai-card-glow" />
+              <div className="patient-ai-header">
+                <div className="patient-ai-header-left">
+                  <div className="patient-ai-avatar">🤖</div>
+                  <div>
+                    <div className="patient-ai-badge">
+                      <span className="patient-ai-badge-dot" />
+                      <span>AI Report Assistant</span>
+                    </div>
+                    <h3 className="patient-ai-title">Ask AI About Your Clinical Report</h3>
+                  </div>
+                </div>
+
+                {reports.length > 1 && (
+                  <div className="patient-ai-selector">
+                    <label htmlFor="patient-report-select">Select Report:</label>
+                    <select
+                      id="patient-report-select"
+                      className="patient-report-select-dropdown"
+                      value={selectedReportId || latestReport.id}
+                      onChange={(e) => setSelectedReportId(e.target.value)}
+                    >
+                      {reports.map((r, idx) => (
+                        <option key={r.id || idx} value={r.id}>
+                          {new Date(r.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })} — {STAGE_CONFIG[r.result?.prediction]?.label || r.result?.prediction || 'Report'} {r.doctorName ? `(Dr. ${r.doctorName})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              <div className="patient-ai-body">
+                <p className="patient-ai-desc">
+                  NeuroSense AI is actively reviewing your assessment from{' '}
+                  <strong>{new Date(currentReport.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</strong>
+                  {currentReport.doctorName ? <> assessed by <strong>Dr. {currentReport.doctorName}</strong></> : ''}.
+                  Click a question below or open the assistant to get clear, reassuring answers about your results.
+                </p>
+
+                <div className="patient-ai-pills">
+                  <span className="patient-ai-pill stage-pill" style={{ color: STAGE_CONFIG[currentReport.result?.prediction]?.color || 'var(--accent)' }}>
+                    🔬 Stage: <strong>{STAGE_CONFIG[currentReport.result?.prediction]?.label || currentReport.result?.prediction || '—'}</strong>
+                    {currentReport.result?.confidence ? ` (${(currentReport.result.confidence * 100).toFixed(0)}%)` : ''}
+                  </span>
+                  {currentReport.form?.cag_repeat && (
+                    <span className="patient-ai-pill">
+                      🧬 CAG: <strong>{currentReport.form.cag_repeat}</strong>
+                    </span>
+                  )}
+                  {currentReport.form?.motor_score != null && (
+                    <span className="patient-ai-pill">
+                      🎯 Motor: <strong>{Number(currentReport.form.motor_score).toFixed(1)}%</strong>
+                    </span>
+                  )}
+                  {currentReport.form?.memory_score != null && (
+                    <span className="patient-ai-pill">
+                      🧠 Memory: <strong>{Number(currentReport.form.memory_score).toFixed(1)}%</strong>
+                    </span>
+                  )}
+                  {currentReport.doctorName && (
+                    <span className="patient-ai-pill doc-pill">
+                      👨‍⚕️ Attending: <strong>Dr. {currentReport.doctorName}</strong>
+                    </span>
+                  )}
+                </div>
+
+                <div className="patient-ai-actions-grid">
+                  <button
+                    className="patient-ai-prompt-card"
+                    onClick={() => openWithReport(currentReport, 'Can you explain my complete clinical report in plain language? What do all my scores and stage mean for me?')}
+                  >
+                    <span className="ai-card-icon">📋</span>
+                    <div className="ai-card-content">
+                      <span className="ai-card-title">Explain My Full Report</span>
+                      <span className="ai-card-sub">Get a simple, clear translation of your clinical findings</span>
+                    </div>
+                  </button>
+
+                  <button
+                    className="patient-ai-prompt-card"
+                    onClick={() => openWithReport(currentReport, `What does my predicted stage of ${STAGE_CONFIG[currentReport.result?.prediction]?.label || 'HD'} and confidence of ${(currentReport.result?.confidence * 100).toFixed(0)}% mean for my daily life?`)}
+                  >
+                    <span className="ai-card-icon">🧠</span>
+                    <div className="ai-card-content">
+                      <span className="ai-card-title">Understand My Stage</span>
+                      <span className="ai-card-sub">What your stage implies for motor function & activities</span>
+                    </div>
+                  </button>
+
+                  {currentReport.form?.cag_repeat ? (
+                    <button
+                      className="patient-ai-prompt-card"
+                      onClick={() => openWithReport(currentReport, `My report indicates a CAG repeat count of ${currentReport.form.cag_repeat}. Can you explain what this genetic marker means?`)}
+                    >
+                      <span className="ai-card-icon">🧬</span>
+                      <div className="ai-card-content">
+                        <span className="ai-card-title">CAG Repeat ({currentReport.form.cag_repeat})</span>
+                        <span className="ai-card-sub">Understand genetic repeat counts and penetrance</span>
+                      </div>
+                    </button>
+                  ) : (
+                    <button
+                      className="patient-ai-prompt-card"
+                      onClick={() => openWithReport(currentReport, 'How did I score on my motor and memory assessments, and what can I do to support my physical and cognitive health?')}
+                    >
+                      <span className="ai-card-icon">🎯</span>
+                      <div className="ai-card-content">
+                        <span className="ai-card-title">Motor & Cognitive Scores</span>
+                        <span className="ai-card-sub">Tips and exercises to keep your scores strong</span>
+                      </div>
+                    </button>
+                  )}
+
+                  <button
+                    className="patient-ai-prompt-card"
+                    onClick={() => openWithReport(currentReport, `Based on my report, what specific questions should I prepare to ask Dr. ${currentReport.doctorName || 'my neurologist'} at my next appointment?`)}
+                  >
+                    <span className="ai-card-icon">👨‍⚕️</span>
+                    <div className="ai-card-content">
+                      <span className="ai-card-title">Questions for Doctor</span>
+                      <span className="ai-card-sub">Personalized checklist for your next neurology visit</span>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Reports Section */}
+          <div className="patient-section-header reveal visible">
+            <h2>📄 Your Clinical Reports</h2>
+            <p>Reports generated from analyses performed by your neurologist.</p>
+          </div>
+
+          {isLoading ? (
+            <div className="patient-loading reveal visible">
+              <div className="auth-spinner" style={{ width: '40px', height: '40px', margin: '40px auto' }} />
+              <p style={{ textAlign: 'center', color: 'var(--text-muted)' }}>Loading your reports...</p>
+            </div>
+          ) : reports.length === 0 ? (
+            <div className="patient-empty reveal visible">
+              <div className="patient-empty-icon">📭</div>
+              <h3>No Reports Available</h3>
+              <p>Your neurologist has not yet performed any analyses. Reports will appear here once an analysis is completed.</p>
+            </div>
+          ) : (
+            <div className="patient-reports-grid">
+              {reports.map((item) => {
+                const itemStage = STAGE_CONFIG[item.result?.prediction];
+                const isExpanded = expandedReport === item.id;
+                return (
+                  <div
+                    key={item.id}
+                    className={`patient-report-card reveal visible ${isExpanded ? 'expanded' : ''}`}
+                    onClick={() => setExpandedReport(isExpanded ? null : item.id)}
+                  >
+                    <div className="patient-report-header">
+                      <span className="patient-report-date">
+                        {new Date(item.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </span>
+                      <span
+                        className="patient-report-badge"
+                        style={{ background: itemStage?.color ? `${itemStage.color}20` : '#eee', color: itemStage?.color || '#999' }}
+                      >
+                        {itemStage?.label || item.result?.prediction || '?'}
+                      </span>
+                    </div>
+
+                    {item.doctorName && (
+                      <div className="patient-report-doctor-tag">
+                        <span className="doctor-tag-icon">👨‍⚕️</span>
+                        <span>Assessed by <strong>Dr. {item.doctorName}</strong></span>
+                      </div>
+                    )}
+
+                    <div className="patient-report-summary">
+                      <div className="patient-report-metric">
+                        <span className="metric-label">Confidence</span>
+                        <span className="metric-value">
+                          {item.result?.confidence ? (item.result.confidence * 100).toFixed(0) + '%' : 'N/A'}
+                        </span>
+                      </div>
+                      <div className="patient-report-metric">
+                        <span className="metric-label">Age</span>
+                        <span className="metric-value">{item.form?.age || '—'}</span>
+                      </div>
+                      <div className="patient-report-metric">
+                        <span className="metric-label">CAG Repeat</span>
+                        <span className="metric-value">{item.form?.cag_repeat || '—'}</span>
+                      </div>
+                    </div>
+
+                    {isExpanded && (
+                      <div className="patient-report-details">
+                        {item.doctorName && (
+                          <div className="patient-detail-row" style={{ color: 'var(--accent-coral)', fontWeight: 600 }}>
+                            <span>Attending Neurologist:</span>
+                            <span>Dr. {item.doctorName} {item.doctorEmail ? `(${item.doctorEmail})` : ''}</span>
+                          </div>
+                        )}
+                        <div className="patient-detail-row">
+                          <span>Motor Score:</span>
+                          <span>{item.form?.motor_score != null ? `${Number(item.form.motor_score).toFixed(1)}%` : '—'}</span>
+                        </div>
+                        <div className="patient-detail-row">
+                          <span>Memory Score:</span>
+                          <span>{item.form?.memory_score != null ? `${Number(item.form.memory_score).toFixed(1)}%` : '—'}</span>
+                        </div>
+                        <div className="patient-detail-row">
+                          <span>Functional Capacity:</span>
+                          <span>{item.form?.functional_score != null ? `${item.form.functional_score}%` : '—'}</span>
+                        </div>
+                        {item.result?.progression_12mo != null && (
+                          <div className="patient-detail-row">
+                            <span>12-Month Forecast:</span>
+                            <span>{(item.result.progression_12mo * 100).toFixed(1)}%</span>
+                          </div>
+                        )}
+                        <div className="patient-report-actions-row">
+                          <button
+                            className="btn btn-secondary patient-ask-ai-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const docStr = item.doctorName ? `assessed by Dr. ${item.doctorName}` : '';
+                              const dateStr = item.date ? new Date(item.date).toLocaleDateString() : '';
+                              openWithReport(item, `Can you explain my clinical report from ${dateStr} ${docStr}? What do all my scores and stage mean in plain language?`);
+                            }}
+                          >
+                            🤖 Ask AI About This Report
+                          </button>
+                          <button
+                            className="btn btn-primary patient-download-btn"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              downloadReport(item.form, item.result, {
+                                doctorName: item.doctorName,
+                                doctorEmail: item.doctorEmail,
+                                patientName: item.patientName || user?.name,
+                                patientEmail: item.patientEmail || user?.email,
+                              });
+                              toast?.success('Clinical report downloaded!');
+                            }}
+                          >
+                            📄 Download Report
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Test Results Section */}
+          {tests.length > 0 && (
+            <>
+              <div className="patient-section-header reveal visible" style={{ marginTop: '48px' }}>
+                <h2>🧪 Your Test Results</h2>
+                <p>Results from cognitive and motor assessments administered during clinical visits.</p>
+              </div>
+              <div className="patient-tests-grid">
+                {tests.slice(0, 12).map((test, idx) => (
+                  <div key={idx} className="patient-test-card reveal visible">
+                    <div className="patient-test-header">
+                      <span className="patient-test-name">{test.testName?.replace(/_/g, ' ') || test.testType}</span>
+                      <span className="patient-test-type">{test.testType || test.testCategory}</span>
+                    </div>
+                    <div className="patient-test-score">
+                      <span className="patient-test-pct">{test.percentage?.toFixed(0) || Math.round((test.score / test.total) * 100)}%</span>
+                      <span className="patient-test-raw">{test.score}/{test.total}</span>
+                    </div>
+                    <div className="patient-test-date">
+                      {test.takenAt ? new Date(test.takenAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : test.createdAt ? new Date(test.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : ''}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+
+        </div>
+      </section>
+      <Footer />
+    </ActiveSectionContext.Provider>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   DOCTOR-ONLY ROUTE GUARD
+   ═══════════════════════════════════════════ */
+
+function DoctorOnlyGuard({ children }) {
+  const { user, isPatient } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (user && isPatient) {
+      toast?.error('This feature is only available for doctors. Redirecting to your dashboard.');
+      navigate('/patient-dashboard');
+    }
+  }, [user, isPatient, navigate, toast]);
+
+  // If patient is logged in, don't render children while redirecting
+  if (user && isPatient) return null;
+
+  return children;
+}
+
+/* ═══════════════════════════════════════════
    APP ROOT (Router + Theme + Auth)
    ═══════════════════════════════════════════ */
 
@@ -7491,6 +7557,18 @@ export default function App() {
     } catch { return null; }
   });
 
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [activeReport, setActiveReport] = useState(null);
+  const [pendingPrompt, setPendingPrompt] = useState('');
+
+  const openWithReport = useCallback((report, initialPrompt = '') => {
+    setActiveReport(report);
+    setIsChatOpen(true);
+    if (initialPrompt) {
+      setPendingPrompt(initialPrompt);
+    }
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem('neurosense-user');
     setUser(null);
@@ -7499,18 +7577,35 @@ export default function App() {
   return (
     <LanguageProvider>
       <ThemeContext.Provider value={theme}>
-        <AuthContext.Provider value={{ user, setUser, logout }}>
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/login" element={<AuthPage />} />
-            <Route path="/memory-test" element={<MemoryTestPage />} />
-            <Route path="/motor-test" element={<MotorTestPage />} />
-            <Route path="/progression" element={<DiseaseProgressionPage />} />
-            <Route path="/history" element={<AnalysisHistoryPage />} />
-            <Route path="/medications" element={<MedicationsPage />} />
-          </Routes>
-          <ChatBot />
-        </AuthContext.Provider>
+        <ToastProvider>
+          <AuthContext.Provider value={{ user, setUser, logout }}>
+            <ChatContext.Provider
+              value={{
+                isOpen: isChatOpen,
+                setIsOpen: setIsChatOpen,
+                activeReport,
+                setActiveReport,
+                openWithReport,
+                pendingPrompt,
+                setPendingPrompt,
+              }}
+            >
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/login" element={<AuthPage />} />
+                <Route path="/patient-dashboard" element={<PatientDashboardPage />} />
+                <Route path="/memory-test" element={<DoctorOnlyGuard><MemoryTestPage /></DoctorOnlyGuard>} />
+                <Route path="/motor-test" element={<DoctorOnlyGuard><MotorTestPage /></DoctorOnlyGuard>} />
+                <Route path="/progression" element={<DiseaseProgressionPage />} />
+                <Route path="/history" element={<AnalysisHistoryPage />} />
+
+                <Route path="/empty-state" element={<EmptyStatePage />} />
+                <Route path="*" element={<NotFoundPage />} />
+              </Routes>
+              <ChatBot />
+            </ChatContext.Provider>
+          </AuthContext.Provider>
+        </ToastProvider>
       </ThemeContext.Provider>
     </LanguageProvider>
   );

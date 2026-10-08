@@ -6512,6 +6512,62 @@
   white-space: nowrap;
 }
 
+/* ─── Normal / Pre-manifest Banner (below brain) ─── */
+.brain-normal-banner {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 18px 24px;
+  border-top: 1px solid rgba(60, 200, 120, 0.2);
+  background: linear-gradient(135deg, rgba(60, 200, 120, 0.06) 0%, transparent 100%);
+  animation: brainNormalSlideIn 0.6s var(--ease) both;
+}
+
+.brain-normal-banner .brain-normal-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 6px rgba(60, 200, 120, 0.35));
+}
+
+.brain-normal-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.brain-normal-banner .brain-normal-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #5ae68b;
+  letter-spacing: 0.02em;
+}
+
+.brain-normal-banner .brain-normal-desc {
+  font-size: 0.78rem;
+  color: rgba(255, 255, 255, 0.55);
+  line-height: 1.5;
+  max-width: 480px;
+}
+
+[data-theme="light"] .brain-normal-banner {
+  border-top-color: rgba(40, 160, 90, 0.2);
+  background: linear-gradient(135deg, rgba(40, 160, 90, 0.06) 0%, transparent 100%);
+}
+
+[data-theme="light"] .brain-normal-banner .brain-normal-title {
+  color: #1d8a42;
+}
+
+[data-theme="light"] .brain-normal-banner .brain-normal-desc {
+  color: rgba(0, 0, 0, 0.5);
+}
+
+@keyframes brainNormalSlideIn {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
 /* ─── Region Detail Panel ─── */
 .brain-region-detail {
   padding: 16px 20px;

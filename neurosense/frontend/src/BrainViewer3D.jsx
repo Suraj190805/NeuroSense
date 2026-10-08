@@ -165,8 +165,6 @@ const BRAIN_REGIONS = [
     position: [0.08, 0.12, 0.08],
     size: 0.11,
     severity: 'critical',
-    color: '#ff3344',
-    glowColor: '#ff0022',
   },
   {
     name: 'Caudate Nucleus (Left)',
@@ -174,8 +172,6 @@ const BRAIN_REGIONS = [
     position: [-0.08, 0.12, 0.08],
     size: 0.11,
     severity: 'critical',
-    color: '#ff3344',
-    glowColor: '#ff0022',
   },
   {
     name: 'Putamen (Right)',
@@ -183,8 +179,6 @@ const BRAIN_REGIONS = [
     position: [0.15, 0.06, 0.04],
     size: 0.12,
     severity: 'critical',
-    color: '#ff4455',
-    glowColor: '#ff2233',
   },
   {
     name: 'Putamen (Left)',
@@ -192,8 +186,6 @@ const BRAIN_REGIONS = [
     position: [-0.15, 0.06, 0.04],
     size: 0.12,
     severity: 'critical',
-    color: '#ff4455',
-    glowColor: '#ff2233',
   },
   {
     name: 'Frontal Cortex',
@@ -201,8 +193,6 @@ const BRAIN_REGIONS = [
     position: [0, 0.3, 0.35],
     size: 0.2,
     severity: 'moderate',
-    color: '#ff8833',
-    glowColor: '#ff6600',
   },
   {
     name: 'Prefrontal Cortex',
@@ -210,8 +200,6 @@ const BRAIN_REGIONS = [
     position: [0, 0.22, 0.42],
     size: 0.16,
     severity: 'moderate',
-    color: '#ffaa33',
-    glowColor: '#ff8800',
   },
   {
     name: 'Globus Pallidus (Right)',
@@ -219,8 +207,6 @@ const BRAIN_REGIONS = [
     position: [0.12, 0.02, 0.02],
     size: 0.07,
     severity: 'moderate',
-    color: '#ff9944',
-    glowColor: '#ff7722',
   },
   {
     name: 'Globus Pallidus (Left)',
@@ -228,8 +214,6 @@ const BRAIN_REGIONS = [
     position: [-0.12, 0.02, 0.02],
     size: 0.07,
     severity: 'moderate',
-    color: '#ff9944',
-    glowColor: '#ff7722',
   },
   {
     name: 'Temporal Cortex (Right)',
@@ -237,8 +221,6 @@ const BRAIN_REGIONS = [
     position: [0.35, -0.12, 0.12],
     size: 0.14,
     severity: 'mild',
-    color: '#ffcc44',
-    glowColor: '#ffaa00',
   },
   {
     name: 'Temporal Cortex (Left)',
@@ -246,8 +228,6 @@ const BRAIN_REGIONS = [
     position: [-0.35, -0.12, 0.12],
     size: 0.14,
     severity: 'mild',
-    color: '#ffcc44',
-    glowColor: '#ffaa00',
   },
   {
     name: 'Cerebellum',
@@ -255,8 +235,6 @@ const BRAIN_REGIONS = [
     position: [0, -0.32, -0.3],
     size: 0.2,
     severity: 'mild',
-    color: '#ffdd55',
-    glowColor: '#ffcc00',
   },
   {
     name: 'Thalamus',
@@ -264,15 +242,40 @@ const BRAIN_REGIONS = [
     position: [0, 0.08, -0.06],
     size: 0.1,
     severity: 'moderate',
-    color: '#ff8844',
-    glowColor: '#ff6622',
   },
 ];
 
-const SEVERITY_CONFIG = {
-  critical: { label: 'Critical (Striatal)', color: '#ff3344' },
-  moderate: { label: 'Moderate (Cortical/BG)', color: '#ff8833' },
-  mild: { label: 'Mild (Secondary)', color: '#ffcc44' },
+/* ─── Stage-Based Color Palettes ─── */
+const STAGE_COLOR_PALETTES = {
+  early: {
+    critical: { color: '#ffd633', glowColor: '#ffcc00' },
+    moderate: { color: '#ffe066', glowColor: '#ffd633' },
+    mild:     { color: '#ffeb99', glowColor: '#ffe066' },
+  },
+  advanced: {
+    critical: { color: '#ff2233', glowColor: '#dd0011' },
+    moderate: { color: '#ff4455', glowColor: '#ee2233' },
+    mild:     { color: '#ff6666', glowColor: '#ff3344' },
+  },
+};
+
+function getRegionColors(stageType, severity) {
+  const palette = STAGE_COLOR_PALETTES[stageType];
+  if (!palette) return { color: '#999', glowColor: '#777' };
+  return palette[severity] || palette.mild;
+}
+
+const SEVERITY_CONFIG_BY_STAGE = {
+  early: {
+    critical: { label: 'Critical (Striatal)', color: '#ffd633' },
+    moderate: { label: 'Moderate (Cortical/BG)', color: '#ffe066' },
+    mild:     { label: 'Mild (Secondary)', color: '#ffeb99' },
+  },
+  advanced: {
+    critical: { label: 'Critical (Striatal)', color: '#ff2233' },
+    moderate: { label: 'Moderate (Cortical/BG)', color: '#ff4455' },
+    mild:     { label: 'Mild (Secondary)', color: '#ff6666' },
+  },
 };
 
 /* ─── Deform Cerebrum Hemispheres with organic winding folds ─── */
@@ -395,16 +398,26 @@ export default function BrainViewer3D({ stage, visible = true }) {
   const [transparency, setTransparency] = useState(0.85);
 
   const getRegionsForStage = useCallback((stageType) => {
+    // Normal / Pre-manifest: no regions affected — plain clean brain
+    if (stageType === 'pre_manifest') return [];
+
+    let regions;
     switch (stageType) {
       case 'advanced':
-        return BRAIN_REGIONS;
+        regions = BRAIN_REGIONS;
+        break;
       case 'early':
-        return BRAIN_REGIONS.filter((r) => r.severity === 'critical' || r.severity === 'moderate');
-      case 'pre_manifest':
-        return BRAIN_REGIONS.filter((r) => r.severity === 'critical');
+        regions = BRAIN_REGIONS.filter((r) => r.severity === 'critical' || r.severity === 'moderate');
+        break;
       default:
-        return BRAIN_REGIONS;
+        regions = BRAIN_REGIONS;
     }
+
+    // Apply stage-specific color palette to each region
+    return regions.map((r) => {
+      const colors = getRegionColors(stageType, r.severity);
+      return { ...r, color: colors.color, glowColor: colors.glowColor };
+    });
   }, []);
 
   // Initialize Three.js scene
@@ -841,8 +854,10 @@ export default function BrainViewer3D({ stage, visible = true }) {
 
   if (!visible) return null;
 
+  const isNormal = stage === 'pre_manifest';
   const activeRegions = getRegionsForStage(stage);
   const severities = [...new Set(activeRegions.map((r) => r.severity))];
+  const sevConfig = SEVERITY_CONFIG_BY_STAGE[stage] || {};
 
   return (
     <div className="brain-viewer-container">
@@ -853,9 +868,15 @@ export default function BrainViewer3D({ stage, visible = true }) {
           <div>
             <h3 className="brain-viewer-title">Interactive 3D Brain Viewer</h3>
             <p className="brain-viewer-subtitle">
-              Huntington's Disease affected regions •{' '}
+              {isNormal
+                ? 'Brain scan analysis — '
+                : "Huntington's Disease affected regions • "}
               <span className="brain-viewer-stage-tag" data-stage={stage}>
-                {stage === 'pre_manifest' ? 'Pre-manifest' : stage === 'early' ? 'Early HD' : 'Advanced HD'}
+                {stage === 'pre_manifest'
+                  ? 'Normal'
+                  : stage === 'early'
+                  ? 'Early HD'
+                  : 'Advanced HD'}
               </span>
             </p>
           </div>
@@ -893,7 +914,7 @@ export default function BrainViewer3D({ stage, visible = true }) {
         <div ref={containerRef} className="brain-viewer-canvas" style={{ cursor: 'grab' }} />
 
         {/* Hover tooltip */}
-        {hoveredRegion && !selectedRegion && (
+        {hoveredRegion && !selectedRegion && !isNormal && (
           <div className="brain-hover-tooltip">
             <span className="brain-tooltip-severity" data-severity={hoveredRegion.severity} />
             <span>{hoveredRegion.name}</span>
@@ -903,12 +924,30 @@ export default function BrainViewer3D({ stage, visible = true }) {
 
         {/* Interaction hint */}
         <div className="brain-viewer-hint">
-          <span>🖱️ Drag to rotate • Scroll to zoom • Click glowing nodes to inspect</span>
+          <span>
+            {isNormal
+              ? '🖱️ Drag to rotate • Scroll to zoom'
+              : '🖱️ Drag to rotate • Scroll to zoom • Click glowing nodes to inspect'}
+          </span>
         </div>
       </div>
 
+      {/* Normal / Pre-manifest: message below the brain */}
+      {isNormal && (
+        <div className="brain-normal-banner">
+          <div className="brain-normal-icon">✅</div>
+          <div className="brain-normal-text">
+            <div className="brain-normal-title">No Affected Regions Detected</div>
+            <div className="brain-normal-desc">
+              Based on the overall clinical assessment, no part of the brain has
+              been identified as affected by Huntington's Disease.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Selected region detail panel */}
-      {selectedRegion && (
+      {selectedRegion && !isNormal && (
         <div className="brain-region-detail">
           <div className="brain-detail-header">
             <span className="brain-detail-severity" data-severity={selectedRegion.severity} />
@@ -918,27 +957,29 @@ export default function BrainViewer3D({ stage, visible = true }) {
           <p className="brain-detail-desc">{selectedRegion.description}</p>
           <div className="brain-detail-meta">
             <span className="brain-detail-tag" data-severity={selectedRegion.severity}>
-              {SEVERITY_CONFIG[selectedRegion.severity]?.label}
+              {sevConfig[selectedRegion.severity]?.label}
             </span>
           </div>
         </div>
       )}
 
-      {/* Legend */}
-      <div className="brain-viewer-legend">
-        <div className="brain-legend-title">Affected Regions</div>
-        <div className="brain-legend-items">
-          {severities.map((sev) => (
-            <div className="brain-legend-item" key={sev}>
-              <span className="brain-legend-dot" style={{ background: SEVERITY_CONFIG[sev]?.color }} />
-              <span className="brain-legend-label">{SEVERITY_CONFIG[sev]?.label}</span>
-            </div>
-          ))}
+      {/* Legend — only show when regions are present */}
+      {!isNormal && (
+        <div className="brain-viewer-legend">
+          <div className="brain-legend-title">Affected Regions</div>
+          <div className="brain-legend-items">
+            {severities.map((sev) => (
+              <div className="brain-legend-item" key={sev}>
+                <span className="brain-legend-dot" style={{ background: sevConfig[sev]?.color }} />
+                <span className="brain-legend-label">{sevConfig[sev]?.label}</span>
+              </div>
+            ))}
+          </div>
+          <div className="brain-legend-count">
+            {activeRegions.length} region{activeRegions.length !== 1 ? 's' : ''} affected
+          </div>
         </div>
-        <div className="brain-legend-count">
-          {activeRegions.length} region{activeRegions.length !== 1 ? 's' : ''} affected
-        </div>
-      </div>
+      )}
     </div>
   );
 }

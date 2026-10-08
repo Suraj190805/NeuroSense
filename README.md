@@ -1,3 +1,17 @@
+---
+title: Neurosense Api
+emoji: 🧠
+colorFrom: green
+colorTo: indigo
+sdk: gradio
+sdk_version: 6.29.1
+python_version: '3.10'
+app_file: app.py
+pinned: false
+license: mit
+short_description: NeuroSense Medical AI Backend
+---
+
 # 🧬 NeuroSense
 
 <p align="center">

@@ -1,0 +1,3 @@
+# NeuroSense — Python Dependencies
+# Root requirements pointer
+-r neurosense/requirements.txt

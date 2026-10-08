@@ -1,0 +1,26 @@
+# Git & IDE
+.git
+.gitignore
+.vscode
+.idea
+
+# Node / Frontend
+neurosense/frontend/node_modules
+neurosense/frontend/dist
+neurosense/frontend/.vite
+
+# Python Virtual Environments & Cache
+__pycache__
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test reports and large data
+reports/
+logs/

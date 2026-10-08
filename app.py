@@ -8,9 +8,22 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 import gradio as gr
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from neurosense.api.main import app as fastapi_app
 
-# Informative status interface for the Hugging Face Space
+# ZeroGPU requires at least one @spaces.GPU function during startup
+try:
+    import spaces
+
+    @spaces.GPU(duration=60)
+    def _zero_gpu_worker():
+        """Satisfies ZeroGPU startup requirement for Hugging Face Spaces."""
+        return True
+except ImportError:
+    pass
+
+# Status dashboard for Space root
 with gr.Blocks(title="NeuroSense AI API") as demo:
     gr.Markdown("""
     # 🧠 NeuroSense — Huntington's Disease AI Backend
@@ -28,10 +41,29 @@ with gr.Blocks(title="NeuroSense AI API") as demo:
     *Backend service for the NeuroSense Vercel web application.*
     """)
 
-# Mount Gradio onto FastAPI so both the status page and all FastAPI endpoints work
-app = gr.mount_gradio_app(fastapi_app, demo, path="/")
+# Attach all FastAPI routes onto Gradio's internal FastAPI app
+demo.app.include_router(fastapi_app.router)
+
+# Mount static heatmaps directory
+heatmap_dir = Path("outputs/heatmaps")
+heatmap_dir.mkdir(parents=True, exist_ok=True)
+demo.app.mount("/static/heatmaps", StaticFiles(directory=str(heatmap_dir)), name="heatmaps")
+
+# Ensure CORS allows Vercel frontend requests
+demo.app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:3000",
+    ],
+    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 if __name__ == "__main__":
-    import uvicorn
-    port = int(os.environ.get("PORT", 7860))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    # Gradio launch handles ZeroGPU internal port allocation automatically
+    demo.launch(server_name="0.0.0.0")

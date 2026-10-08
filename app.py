@@ -41,8 +41,8 @@ with gr.Blocks(title="NeuroSense AI API") as demo:
     *Backend service for the NeuroSense Vercel web application.*
     """)
 
-# Attach all FastAPI routes onto Gradio's internal FastAPI app
-demo.app.include_router(fastapi_app.router)
+# Prepend all FastAPI routes so they take priority over Gradio's SvelteKit handlers
+demo.app.router.routes = list(fastapi_app.router.routes) + demo.app.router.routes
 
 # Mount static heatmaps directory
 heatmap_dir = Path("outputs/heatmaps")

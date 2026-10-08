@@ -1,3 +1,30 @@
-# NeuroSense — Python Dependencies
-# Root requirements pointer
--r neurosense/requirements.txt
+# NeuroSense — Python Dependencies for Hugging Face Spaces & Production
+# Deep Learning & Medical Imaging
+torch>=2.0.0,<3.0.0
+torchvision>=0.15.0,<1.0.0
+monai==1.3.0
+nibabel>=5.0.0,<6.0.0
+pytorch-grad-cam>=1.5.0,<2.0.0
+shap>=0.43.0,<1.0.0
+
+# Backend API & Server
+fastapi>=0.115.0,<1.0.0
+uvicorn[standard]>=0.30.0,<1.0.0
+pydantic>=2.0.0,<3.0.0
+python-multipart>=0.0.6,<1.0.0
+gradio>=4.0.0
+
+# ML Utilities
+scikit-learn>=1.3.0,<2.0.0
+numpy>=1.24.0,<2.0.0
+pandas>=2.0.0,<3.0.0
+matplotlib>=3.7.0,<4.0.0
+wandb>=0.16.0,<1.0.0
+pyyaml>=6.0,<7.0
+
+# Database
+motor>=3.3.0,<4.0.0
+pymongo>=4.6.0,<5.0.0
+certifi>=2024.0.0
+python-dotenv>=1.0.0
+httpx>=0.25.0,<1.0.0

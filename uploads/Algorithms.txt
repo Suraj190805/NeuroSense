@@ -1,214 +1,267 @@
 ================================================================================
-                    NEUROSENSE — ALGORITHM & MODEL ARCHITECTURE SPECIFICATION
+          NEUROSENSE — CORE ALGORITHMS & REPRESENTATIVE CODE SNIPPETS
 ================================================================================
-Project: NeuroSense (Multimodal AI Platform for Huntington's Disease Detection, Staging & Progression)
-Target: Comprehensive reference of all machine learning, deep learning, explainability,
-        statistical, and clinical assessment algorithms implemented across the project.
+Project : NeuroSense (Multimodal AI Platform for Huntington's Disease)
+File    : uploads/Algorithms.txt
+Summary : Essential algorithms, mathematical logic, and concise code snippets
+          powering neuroimaging, clinical modeling, fusion, and explainability.
 ================================================================================
 
---------------------------------------------------------------------------------
-1. 3D RESNET-50 (3D CONVOLUTIONAL NEURAL NETWORK)
---------------------------------------------------------------------------------
-• WHERE USED:
-  - neurosense/models/mri_encoder.py
-  - neurosense/models/classifier.py
-
-• HOW IT WORKS:
-  - Extends standard 2D residual networks to 3D spatial convolutions (Conv3d, BatchNorm3d, ReLU).
-  - Processes full 3D volumetric T1-weighted structural MRI scans (NIfTI format, 96×96×96 or 128×128×128 voxels).
-  - Comprises 4 bottleneck residual blocks (layer1 to layer4) with shortcut identity connections that mitigate vanishing gradients.
-  - Generates a rich 2048-dimensional dense spatial feature embedding via 3D Adaptive Average Pooling.
-
-• WHY WE USED IT:
-  - Huntington's Disease is characterized by complex 3D neurodegeneration (atrophy of the caudate nucleus, putamen/striatum, and lateral ventricular enlargement) that cannot be accurately captured by 2D slices alone.
-  - 3D ResNet preserves continuous inter-slice spatial context, volumetric depth, and anatomical symmetries across coronal, sagittal, and axial planes.
-
 
 --------------------------------------------------------------------------------
-2. 2D RESNET-50 WITH TRANSFER LEARNING (MRI SLICE CLASSIFIER)
+1. 3D RESNET-50 (VOLUMETRIC STRUCTURAL MRI ENCODER)
 --------------------------------------------------------------------------------
-• WHERE USED:
-  - neurosense/models/image_classifier.py
-  - neurosense/api/main.py (Endpoint: /predict-image)
+• WHERE USED: neurosense/models/mri_encoder.py
+• LOGIC: Extends 2D convolutions to 3D spatial tensors (D×H×W). Residual bottleneck
+  blocks preserve volumetric depth and anatomical symmetries (caudate/putamen).
 
-• HOW IT WORKS:
-  - Utilizes an ImageNet-pretrained 2D ResNet-50 backbone with fine-tuned top layers.
-  - Replaces final 1000-class fully-connected layer with a custom medical classification head:
-    Linear(2048 → 512) → ReLU → Dropout(p=0.3) → Linear(512 → 2/3 classes).
-  - Processes standard 2D brain MRI slice images (.png, .jpg, .jpeg) normalized to 224×224 pixels.
+• CODE SNIPPET:
+```python
+class Bottleneck3D(nn.Module):
+    def __init__(self, in_ch, out_ch, stride=1):
+        super().__init__()
+        mid_ch = out_ch // 4
+        self.conv1 = nn.Conv3d(in_ch, mid_ch, kernel_size=1, bias=False)
+        self.conv2 = nn.Conv3d(mid_ch, mid_ch, kernel_size=3, stride=stride, padding=1, bias=False)
+        self.conv3 = nn.Conv3d(mid_ch, out_ch, kernel_size=1, bias=False)
+        self.shortcut = nn.Sequential() if in_ch == out_ch else nn.Conv3d(in_ch, out_ch, 1, stride)
 
-• WHY WE USED IT:
-  - Enables instant, browser-based, at-home screening for patients and families who only possess exported 2D slice images or hospital scan photographs rather than specialized 3D NIfTI volumes.
-  - Transfer learning prevents overfitting on smaller medical image cohorts while providing high visual discriminative power.
+    def forward(self, x):
+        res = self.shortcut(x)
+        out = F.relu(self.conv1(x))
+        out = F.relu(self.conv2(out))
+        out = self.conv3(out)
+        return F.relu(out + res)
+```
 
 
 --------------------------------------------------------------------------------
-3. BIDIRECTIONAL LONG SHORT-TERM MEMORY (BI-LSTM)
+2. 2D RESNET-50 SLICE CLASSIFIER (TRANSFER LEARNING)
 --------------------------------------------------------------------------------
-• WHERE USED:
-  - neurosense/models/clinical_encoder.py
-  - neurosense/models/classifier.py
+• WHERE USED: neurosense/models/image_classifier.py
+• LOGIC: Uses ImageNet-pretrained weights with a custom medical classification head
+  for fast, at-home 2D MRI slice evaluations.
 
-• HOW IT WORKS:
-  - 2-layer Bidirectional Recurrent Neural Network (LSTM) with hidden dimension 128/256.
-  - Operates on longitudinal clinical/digital assessment sequences [Batch, Time_Steps, 5]:
-    1. CAG Trinucleotide Repeat Count (genetic marker)
-    2. Motor Assessment Score (0–100%)
-    3. Memory & Cognitive Score (0–100%)
-    4. Daily Functional Independence Capacity (0–100%)
-    5. Patient Age (years)
-  - Processes sequences forward in time (past → future trajectory) and backward (future context), concatenating both hidden state vectors.
+• CODE SNIPPET:
+```python
+class HDImageClassifier(nn.Module):
+    def __init__(self, num_classes=3, pretrained=True):
+        super().__init__()
+        self.backbone = torchvision.models.resnet50(weights="DEFAULT" if pretrained else None)
+        in_features = self.backbone.fc.in_features  # 2048
+        self.backbone.fc = nn.Sequential(
+            nn.Linear(in_features, 512),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=0.3),
+            nn.Linear(512, num_classes)
+        )
+    def forward(self, x):
+        return self.backbone(x)  # [B, 3] logits
+```
 
-• WHY WE USED IT:
-  - Huntington's Disease is progressive and dynamic; symptom decline is non-linear.
-  - Bi-LSTM captures velocity, acceleration, and inflection points of functional and motor decline across sequential patient visits, outperforming static feedforward networks.
+
+--------------------------------------------------------------------------------
+3. BIDIRECTIONAL LSTM (LONGITUDINAL CLINICAL ENCODER)
+--------------------------------------------------------------------------------
+• WHERE USED: neurosense/models/clinical_encoder.py
+• LOGIC: 2-layer Bi-LSTM encodes sequential clinical visits [B, T, 5] (CAG, motor,
+  cognitive, daily function, age), concatenating forward and backward trajectories.
+
+• CODE SNIPPET:
+```python
+class ClinicalEncoder(nn.Module):
+    def __init__(self, input_dim=5, hidden_dim=256, embed_dim=256):
+        super().__init__()
+        self.lstm = nn.LSTM(input_dim, hidden_dim, num_layers=2,
+                            batch_first=True, bidirectional=True, dropout=0.3)
+        self.proj = nn.Sequential(
+            nn.Linear(hidden_dim * 2, embed_dim),  # 512 -> 256
+            nn.ReLU(),
+            nn.LayerNorm(embed_dim)
+        )
+    def forward(self, x, lengths):
+        packed = nn.utils.rnn.pack_padded_sequence(x, lengths.cpu(), batch_first=True, enforce_sorted=False)
+        _, (h_n, _) = self.lstm(packed)
+        cat_h = torch.cat([h_n[-2], h_n[-1]], dim=-1)  # [B, 512]
+        return self.proj(cat_h)                         # [B, 256]
+```
 
 
 --------------------------------------------------------------------------------
 4. CROSS-MODAL MULTI-HEAD ATTENTION FUSION
 --------------------------------------------------------------------------------
-• WHERE USED:
-  - neurosense/models/fusion.py
-  - neurosense/models/classifier.py
+• WHERE USED: neurosense/models/fusion.py
+• LOGIC: Visual Query (MRI) attends to Key/Value of Clinical features; cross-modal
+  representations are fused through LayerNorm, residual additions, and a feedforward block.
 
-• HOW IT WORKS:
-  - Implements scaled dot-product cross-attention: Attention(Q, K, V) = softmax((Q · K^T) / sqrt(d_k)) · V.
-  - Bidirectional Cross-Modal Streams:
-    a) Visual Query (MRI) attends to Key/Value of Clinical Assessment stream.
-    b) Clinical Query attends to Key/Value of MRI Spatial Representation stream.
-  - The outputs are fused via gated residual connections and layer normalization into a joint multimodal embedding vector.
+• CODE SNIPPET:
+```python
+class CrossModalFusion(nn.Module):
+    def __init__(self, embed_dim=256, num_heads=8):
+        super().__init__()
+        self.cross_attn = nn.MultiheadAttention(embed_dim, num_heads, batch_first=True)
+        self.norm1 = nn.LayerNorm(embed_dim)
+        self.ffn = nn.Sequential(nn.Linear(embed_dim, 1024), nn.GELU(), nn.Linear(1024, embed_dim))
+        self.norm2 = nn.LayerNorm(embed_dim)
 
-• WHY WE USED IT:
-  - Multi-modal synergy: Brain atrophy visible on MRI often precedes motor symptoms, while cognitive and functional tests reflect real-world disability.
-  - Cross-attention learns inter-modal dependencies—such as correlating striatal volume reduction directly with specific motor and memory deficits—yielding significantly higher staging accuracy than simple concatenation or early fusion.
-
-
---------------------------------------------------------------------------------
-5. GRADCAM++ (3D & 2D GENERALIZED GRADIENT-WEIGHTED CLASS ACTIVATION MAPPING)
---------------------------------------------------------------------------------
-• WHERE USED:
-  - neurosense/explainability/gradcam.py (GradCAM3D and GradCAM2D)
-  - neurosense/explainability/visualise.py
-  - neurosense/api/main.py & inference.py
-
-• HOW IT WORKS:
-  - Computes higher-order (2nd and 3rd order) partial derivatives of the predicted class score Y^c with respect to convolutional feature maps A_k:
-    alpha_{k}^{c} = [d²Y^c / d(A_k)²] / [2 · d²Y^c / d(A_k)² + sum(A_k · d³Y^c / d(A_k)³)]
-  - Weights positive gradient contributions (ReLU) to produce a normalized 2D/3D spatial heatmap in range [0, 1].
-  - Overlays the 'jet' colormap heatmap with alpha blending onto the anatomical brain MRI.
-
-• WHY WE USED IT:
-  - Explainable AI (XAI) & Medical Interpretability: Deep neural networks cannot be "black boxes" in healthcare.
-  - Highlights exact anatomical neurodegenerative hotspots (caudate nucleus, putamen, subcortical white matter, and cerebral cortex) that drove the model's classification, allowing clinicians to verify AI findings against established neurological pathology.
+    def forward(self, img_emb, clin_emb):
+        # Q = MRI, K & V = Clinical
+        q, kv = img_emb.unsqueeze(1), clin_emb.unsqueeze(1)
+        attn_out, _ = self.cross_attn(query=q, key=kv, value=kv)
+        x = self.norm1(q + attn_out)
+        out = self.norm2(x + self.ffn(x))
+        return out.squeeze(1)  # [B, 256] joint embedding
+```
 
 
 --------------------------------------------------------------------------------
-6. SHAP (SHAPLEY ADDITIVE EXPLANATIONS — DEEP & KERNEL EXPLAINERS)
+5. GRADCAM++ (EXPLAINABLE AI ACTIVATION HEATMAPS)
 --------------------------------------------------------------------------------
-• WHERE USED:
-  - neurosense/explainability/shap_analysis.py
-  - neurosense/explainability/visualise.py
+• WHERE USED: neurosense/explainability/gradcam.py
+• LOGIC: Computes 2nd and 3rd order gradients to weight feature map activations,
+  generating spatial heatmaps that pinpoint striatal neurodegeneration.
 
-• HOW IT WORKS:
-  - Based on cooperative game theory: assigns an importance value phi_i to each clinical feature across all possible feature subsets (coalitions).
-  - Calculates marginal contribution: phi_i = sum [ |S|!(|F|-|S|-1)! / |F|! ] · [ f(S U {i}) - f(S) ].
-  - Generates signed feature impact scores and SHAP waterfall/bar attribution charts.
-
-• WHY WE USED IT:
-  - Explains the exact contribution (positive or negative) of each patient biomarker (e.g. how much did CAG=44 push the prediction toward Early HD vs how much did Motor Score=85% pull it toward Pre-manifest).
-  - Ensures transparency, fairness, and trust for healthcare providers and patients.
-
-
---------------------------------------------------------------------------------
-7. MULTI-TASK PROGRESSION FORECASTING HEAD (JOINT CLASSIFICATION & REGRESSION)
---------------------------------------------------------------------------------
-• WHERE USED:
-  - neurosense/models/classifier.py
-  - neurosense/models/loss.py
-
-• HOW IT WORKS:
-  - Shared multimodal representation branches into two specialized output heads:
-    1. Staging Classifier Head: Linear(D → 3) with Softmax for categorical probabilities (Pre-manifest, Early HD, Advanced HD).
-    2. Dual-Horizon Progression Regression Head: Linear(D → 2) predicting continuous progression risk / delta index at:
-       - 12-Month horizon (progression_12mo)
-       - 24-Month horizon (progression_24mo)
-  - Joint multi-task loss optimization: L_total = L_classification(CrossEntropy) + lambda1 · L_reg_12mo(Huber/MSE) + lambda2 · L_reg_24mo(Huber/MSE).
-
-• WHY WE USED IT:
-  - Patients and neurologists need more than a snapshot classification; they require forward-looking disease progression trajectory to schedule interventions, clinical trial enrollment, and therapy planning.
+• CODE SNIPPET:
+```python
+def compute_gradcam_weights(gradients, activations):
+    # gradients: [B, C, D, H, W], activations: [B, C, D, H, W]
+    g2 = gradients.pow(2)
+    g3 = gradients.pow(3)
+    sum_acts = activations.sum(dim=(2, 3, 4), keepdim=True)
+    denom = 2 * g2 + sum_acts * g3
+    denom = torch.where(denom != 0.0, denom, torch.ones_like(denom))
+    aij = g2 / denom
+    alpha = (aij * F.relu(gradients)).sum(dim=(2, 3, 4), keepdim=True)
+    heatmap = F.relu((alpha * activations).sum(dim=1, keepdim=True))
+    return heatmap  # [B, 1, D, H, W]
+```
 
 
 --------------------------------------------------------------------------------
-8. ADAPTIVE CONFIDENCE-WEIGHTED CLINICAL SCORING & FUSION ENGINE
+6. SHAP ATTRIBUTION (FEATURE CONTRIBUTIONS)
 --------------------------------------------------------------------------------
-• WHERE USED:
-  - neurosense/api/clinical_scoring.py
-  - neurosense/api/main.py
+• WHERE USED: neurosense/explainability/shap_analysis.py
+• LOGIC: Cooperative game theory calculates exact directional impact (phi_i) of each
+  clinical biomarker (CAG, Motor, Cognitive, Function, Age) on the prediction.
 
-• HOW IT WORKS:
-  - Integrates empirical neurobiological models with digital assessment scoring:
-    a) Genetic Disease Burden: Langbehn et al. formula -> Burden Score = Age · (CAG - 35.5).
-    b) Motor Impairment Model: Non-linear penalty derived from digital reaction time, finger tapping speed, and coordination.
-    c) Cognitive/Memory Decline Model: Multi-domain decay function based on word recall, sequence span, and visual change detection.
-    d) Functional Independence Scale: Shoulson-Fahn translation to daily living capacity (0–100%).
-  - Dynamically computes probability distribution across stages and fuses image model probabilities with clinical certainty weights.
+• CODE SNIPPET:
+```python
+import shap
 
-• WHY WE USED IT:
-  - Allows robust prediction when users only have digital tests (no MRI), when users have MRI without genetic testing, or when both modalities are combined.
-  - Ensures backwards-compatibility with legacy clinical scales (UHDRS Motor, Cognitive, TFC) while enabling digital at-home self-assessment.
-
-
---------------------------------------------------------------------------------
-9. DIGITAL MOTOR & COGNITIVE ASSESSMENT ALGORITHMS (AT-HOME TESTING SUITE)
---------------------------------------------------------------------------------
-• WHERE USED:
-  - neurosense/frontend/src/App.jsx
-
-• ALGORITHMS IMPLEMENTED:
-  1. 5-Round Progressive Sequence Memory (Visuospatial Working Memory):
-     - Dynamically generates random spatial permutations avoiding identical adjacent repeats.
-     - Scales difficulty across 5 rounds: Length 3 (750ms) -> 4 (650ms) -> 5 (550ms) -> 6 (460ms) -> 7 (380ms).
-     - Measures Corsi-block spatial span and working memory capacity.
-
-  2. Word Recall with Mathematical Distraction (Verbal Episodic Memory):
-     - Displays pseudo-randomized phonetically distinct semantic word lists with fixed study time (15s).
-     - Implements a 15-second active arithmetic distraction task to clear short-term phonological echoic buffer.
-     - Evaluates long-term verbal episodic recall with Levenshtein fuzzy string normalization.
-
-  3. Visual Change Detection (Visual Short-Term Memory Binding):
-     - Displays an N-element geometric matrix (shapes, colors, spatial positions).
-     - Inserts a 1000ms blank mask (visual flicker paradigm) followed by perturbed probe grid.
-     - Calculates feature-binding retention accuracy under spatial transformation.
-
-  4. Reaction Time & Bradykinesia Latency (Simple Motor Speed):
-     - Random delay timer (1.5s–4.0s) to eliminate anticipation artifacts.
-     - High-precision performance.now() millisecond timestamp delta measurement.
-
-  5. Finger Tapping Frequency (Motor Speed & Bradykinesia):
-     - 10-second continuous tap counter evaluating tapping frequency (Hz), fatigue slope, and rhythm stability.
-
-  6. Target Tracking & Hand-Eye Coordination (Chorea & Dysmetria):
-     - 2D trajectory path generation with continuous Euclidean distance deviation tracking:
-       Distance = sqrt((x_target - x_cursor)² + (y_target - y_cursor)²).
-
-• WHY WE USED IT:
-  - Replaces inaccessible, expensive clinical UHDRS assessments with scientifically validated, gamified digital biomarkers accessible from any smartphone, tablet, or laptop.
+def explain_clinical_sample(model, background_tensor, sample_tensor):
+    explainer = shap.DeepExplainer(model, background_tensor)
+    shap_values = explainer.shap_values(sample_tensor)  # [classes, features]
+    feature_attributions = {
+        feat_name: float(val)
+        for feat_name, val in zip(["CAG", "Motor", "Memory", "Function", "Age"], shap_values[0])
+    }
+    return feature_attributions
+```
 
 
 --------------------------------------------------------------------------------
-10. OPTIMIZATION & TRAINING ALGORITHMS
+7. MULTI-TASK PROGRESSION FORECASTING HEAD
 --------------------------------------------------------------------------------
-• WHERE USED:
-  - neurosense/training/trainer.py
-  - neurosense/training/evaluate.py
+• WHERE USED: neurosense/models/classifier.py
+• LOGIC: Dual-headed output: categorical classification (Pre-manifest, Early, Advanced)
+  alongside continuous regression predicting 12-month and 24-month progression delta.
 
-• HOW IT WORKS:
-  - AdamW Optimizer: Decoupled weight decay regularization to avoid gradient scaling distortions.
-  - Cosine Annealing with Warm Restarts Learning Rate Scheduler:
-    eta_t = eta_min + 0.5 · (eta_max - eta_min) · (1 + cos(pi · T_cur / T_i)).
-  - Mixed Precision Training (torch.cuda.amp.autocast): Accelerates 3D volumetric tensor computations with FP16/BF16 while maintaining FP32 master weights.
-  - Data Augmentation for 3D MRI: Random 3D affine rotations (+-15 deg), random scaling (0.9–1.1), Gaussian noise injection, and intensity windowing.
+• CODE SNIPPET:
+```python
+class MultiTaskHead(nn.Module):
+    def __init__(self, embed_dim=256, num_classes=3):
+        super().__init__()
+        self.classifier = nn.Linear(embed_dim, num_classes)       # Staging
+        self.progression = nn.Linear(embed_dim, 2)               # [12-mo Δ, 24-mo Δ]
 
-• WHY WE USED IT:
-  - Enables stable convergence when training deep 3D volumetric neural networks on GPU/MPS hardware without gradient explosion or memory exhaustion.
+    def forward(self, fused_emb):
+        logits = self.classifier(fused_emb)
+        deltas = self.progression(fused_emb)
+        probs = F.softmax(logits, dim=-1)
+        return {"logits": logits, "probs": probs, "deltas": deltas}
+```
+
+
+--------------------------------------------------------------------------------
+8. ADAPTIVE CLINICAL SCORING & LANGBEHN MOTOR ONSET ENGINE
+--------------------------------------------------------------------------------
+• WHERE USED: neurosense/api/clinical_scoring.py
+• LOGIC: Empirical parametric formula (Langbehn et al.) calculates estimated years
+  to motor onset based on CAG repeat length and patient age.
+
+• CODE SNIPPET:
+```python
+def langbehn_onset_estimation(cag_repeat: float, age: float) -> float:
+    if cag_repeat < 36:
+        return 50.0  # Normal non-expanded allele
+    # Median motor onset equation:
+    median_onset = 21.54 + math.exp(9.556 - 0.146 * cag_repeat)
+    median_onset = max(15.0, min(90.0, median_onset))
+    years_to_onset = median_onset - age
+    return years_to_onset  # Positive = pre-manifest years remaining
+```
+
+
+--------------------------------------------------------------------------------
+9. DIGITAL AT-HOME MOTOR & COGNITIVE TESTS
+--------------------------------------------------------------------------------
+• WHERE USED: neurosense/frontend/src/App.jsx
+• LOGIC: Gamified digital biomarkers quantifying motor speed, memory span, and dysmetria.
+
+• CODE SNIPPETS:
+a) Visuospatial Working Memory (Corsi sequence scaling):
+```javascript
+const generateSequence = (length) => {
+  const seq = [];
+  while (seq.length < length) {
+    const tile = Math.floor(Math.random() * 9);
+    if (seq[seq.length - 1] !== tile) seq.push(tile); // No consecutive duplicates
+  }
+  return seq;
+};
+```
+
+b) Simple Reaction Time (Random-delay latency delta):
+```javascript
+const triggerTarget = () => {
+  const delayMs = 1500 + Math.random() * 2500; // 1.5s - 4.0s
+  setTimeout(() => {
+    startTime = performance.now();
+    setActive(true);
+  }, delayMs);
+};
+const handleClick = () => {
+  const reactionTimeMs = performance.now() - startTime;
+};
+```
+
+c) Motor Coordination & Dysmetria (Euclidean path deviation):
+```javascript
+const calcTrackingError = (cursorX, cursorY, targetX, targetY) => {
+  return Math.hypot(cursorX - targetX, cursorY - targetY); // Pixel deviation
+};
+```
+
+
+--------------------------------------------------------------------------------
+10. OPTIMIZATION & LOSS FUNCTION PIPELINE
+--------------------------------------------------------------------------------
+• WHERE USED: neurosense/training/trainer.py, neurosense/models/loss.py
+• LOGIC: Combines Cross-Entropy/Focal Loss with Multi-Task Huber Regression Loss
+  and Cosine Annealing with Warm Restarts.
+
+• CODE SNIPPET:
+```python
+class CompositeLoss(nn.Module):
+    def __init__(self, lambda_prog=0.5):
+        super().__init__()
+        self.cls_loss = nn.CrossEntropyLoss()
+        self.reg_loss = nn.SmoothL1Loss()  # Huber loss
+        self.lambda_prog = lambda_prog
+
+    def forward(self, logits, targets, pred_deltas, target_deltas):
+        loss_cls = self.cls_loss(logits, targets)
+        loss_reg = self.reg_loss(pred_deltas, target_deltas)
+        return loss_cls + self.lambda_prog * loss_reg
+```
 ================================================================================

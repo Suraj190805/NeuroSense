@@ -5,7 +5,7 @@ import { ToastProvider, useToast } from './ToastContext';
 import BrainViewer3D from './BrainViewer3D';
 import './App.css';
 
-const API_BASE = 'http://localhost:8000';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 const STAGE_CONFIG = {
   pre_manifest: { label: 'Normal / Pre-manifest (Unaffected)', color: 'var(--stage-pre)' },

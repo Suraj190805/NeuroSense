@@ -23,6 +23,10 @@
 
 ---
 
+LIVE LINK : https://neuro-sense-tau.vercel.app/
+
+---
+
 ## 📌 Overview
 
 **NeuroSense** is a comprehensive clinical decision support ecosystem engineered for the early detection, multi-class staging, and longitudinal progression forecasting of **Huntington’s Disease (HD)**. 
